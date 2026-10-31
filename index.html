@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ModShift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Layout: single centered column of three numbered steps (add → choose → result); results as dense scan rows. Copper + oxidized-copper palette. */
+:root{
+  --bg:#ECEEEC; --surface:#FFFFFF; --surface2:#F4F5F3; --line:#D3D8D4;
+  --fg:#1B201E; --muted:#5D6762;
+  --accent:#B05E2B; --accent-fg:#FFFFFF; --accent-soft:#F3E3D7;
+  --ok:#2C8569; --ok-soft:#DDEFE8; --warn:#9A7200; --warn-soft:#F5ECCF;
+  --bad:#B33A3A; --bad-soft:#F6DEDE; --info:#2F67AE; --info-soft:#DCE7F5;
+  --f-display:"Pixelify Sans", ui-monospace, monospace;
+  --f-body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#131615; --surface:#1B1F1E; --surface2:#222725; --line:#323a37;
+  --fg:#E5E9E6; --muted:#98A39D;
+  --accent:#E0894D; --accent-fg:#1A0F08; --accent-soft:#3A2618;
+  --ok:#4FBF9C; --ok-soft:#173129; --warn:#E3B93C; --warn-soft:#352C12;
+  --bad:#E86F6F; --bad-soft:#3A1C1C; --info:#73A3E6; --info-soft:#1A2A40;
+  color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#131615; --surface:#1B1F1E; --surface2:#222725; --line:#323a37;
+  --fg:#E5E9E6; --muted:#98A39D;
+  --accent:#E0894D; --accent-fg:#1A0F08; --accent-soft:#3A2618;
+  --ok:#4FBF9C; --ok-soft:#173129; --warn:#E3B93C; --warn-soft:#352C12;
+  --bad:#E86F6F; --bad-soft:#3A1C1C; --info:#73A3E6; --info-soft:#1A2A40;
+  color-scheme:dark; }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-block:24px 64px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font:700 2rem/1 var(--f-display);margin:0;letter-spacing:.02em}
+h1 span{color:var(--accent)}
+.tag{color:var(--muted);margin:6px 0 0;max-width:60ch}
+h2{font:500 1.15rem/1.2 var(--f-display);margin:0;display:flex;align-items:center;gap:10px}
+h2 .n{display:inline-grid;place-items:center;width:26px;height:26px;background:var(--accent);color:var(--accent-fg);font-size:.95rem}
+section.step{background:var(--surface);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+button,.btn{font:600 .95rem var(--f-body);border:1px solid var(--line);background:var(--surface2);color:var(--fg);padding:9px 14px;cursor:pointer;border-radius:2px;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);box-shadow:inset 0 -3px 0 rgba(0,0,0,.22)}
+button.primary:active{box-shadow:inset 0 2px 0 rgba(0,0,0,.22)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.drop{border:2px dashed var(--line);background:var(--surface2);padding:28px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop p{margin:0;color:var(--muted)}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.files{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:600}
+.files .list{font:400 .8rem var(--f-mono);color:var(--muted);max-height:96px;overflow:auto;width:100%;word-break:break-all}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.modes{grid-template-columns:1fr}}
+.mode{position:relative;border:1px solid var(--line);background:var(--surface2);padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.mode input{position:absolute;opacity:0;pointer-events:none}
+.mode b{font-weight:700}
+.mode small{color:var(--muted);font-size:.85rem;line-height:1.4}
+.mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.mode:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+label.f{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.9rem;min-width:0}
+label.f small{font-weight:400;color:var(--muted);line-height:1.4}
+select,input[type=text],input[type=password],input[type=url]{font:400 .95rem var(--f-body);padding:9px 10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:2px;width:100%;min-width:0}
+.chk{display:flex;align-items:center;gap:8px;font-weight:500;font-size:.9rem;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--accent)}
+.info{font-size:.88rem;color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.prog{display:flex;flex-direction:column;gap:6px}
+.bar{height:8px;background:var(--surface2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.msg{padding:10px 12px;font-size:.9rem;border-left:3px solid var(--info);background:var(--info-soft)}
+.msg.bad{border-color:var(--bad);background:var(--bad-soft)}
+.msg.warn{border-color:var(--warn);background:var(--warn-soft)}
+.msg.ok{border-color:var(--ok);background:var(--ok-soft)}
+.sum{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font:600 .75rem var(--f-body);padding:3px 8px;border-radius:2px;white-space:nowrap;letter-spacing:.02em}
+.p-update{background:var(--accent-soft);color:var(--accent)}
+.p-dep{background:var(--info-soft);color:var(--info)}
+.p-keep,.p-current{background:var(--ok-soft);color:var(--ok)}
+.p-manual{background:var(--warn-soft);color:var(--warn)}
+.p-missing{background:var(--bad-soft);color:var(--bad)}
+.p-unknown,.p-dup{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+.list-mods{display:flex;flex-direction:column;border:1px solid var(--line)}
+.mod{display:grid;grid-template-columns:auto 36px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface)}
+.mod:last-child{border-bottom:0}
+.mod.off{opacity:.55}
+.mod .ic{width:36px;height:36px;background:var(--surface2);border:1px solid var(--line);object-fit:cover;image-rendering:pixelated;display:block}
+.mod .nm{font-weight:600;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;min-width:0;word-break:break-word}
+.mod .src{font:600 .7rem var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mod .vr{font:400 .8rem var(--f-mono);color:var(--muted);word-break:break-all}
+.mod .vr b{color:var(--fg);font-weight:600}
+.mod .nt{font-size:.82rem;color:var(--muted)}
+.mod a.go{color:var(--muted);text-decoration:none;font-size:1.1rem;padding:4px}
+.mod a.go:hover{color:var(--accent)}
+@media (max-width:560px){.mod{grid-template-columns:auto 36px minmax(0,1fr)}.mod .pill{grid-column:3;justify-self:start}.mod a.go{display:none}}
+.out{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+dialog{border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:0;width:min(640px, calc(100vw - 32px));max-height:calc(100vh - 48px)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dlg{padding:20px;display:flex;flex-direction:column;gap:14px}
+.dlg-h{display:flex;justify-content:space-between;align-items:center}
+details summary{cursor:pointer;font-weight:600;font-size:.9rem}
+pre.code{font:400 .75rem/1.5 var(--f-mono);background:var(--surface2);border:1px solid var(--line);padding:12px;overflow-x:auto;margin:8px 0 0;white-space:pre}
+footer{color:var(--muted);font-size:.82rem;text-align:center}
+.cmp{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);padding:12px;background:var(--surface2)}
+.cmp h3{font:500 1rem var(--f-display);margin:0 0 8px}
+.cmp details{border-bottom:1px solid var(--line)}
+.cmp details:last-child{border-bottom:0}
+.cmp summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:76px minmax(0,1fr) 64px auto;gap:10px;align-items:center;padding:6px 0}
+.cmp summary::-webkit-details-marker{display:none}
+.cmp .v{font:600 .85rem var(--f-mono)}
+.cmp .c{font:400 .8rem var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.cmp .b{height:10px;background:var(--surface);border:1px solid var(--line)}
+.cmp .b i{display:block;height:100%}
+.b .full{background:var(--ok)}.b .most{background:var(--accent)}.b .few{background:var(--bad)}
+.cmp .miss{font-size:.82rem;color:var(--muted);padding:0 0 8px 86px}
+@media (max-width:560px){.cmp summary{grid-template-columns:60px minmax(0,1fr) 52px}.cmp summary button{grid-column:1/-1;justify-self:start}.cmp .miss{padding-left:0}}
+button.sm{padding:4px 10px;font-size:.8rem}
+button.lnk{background:none;border:0;padding:0;color:var(--accent);font-size:.82rem;font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.mod .cf{color:var(--bad);font-size:.82rem;font-weight:600}
+.cl{display:flex;flex-direction:column;gap:4px;font-size:.9rem;overflow-wrap:anywhere}
+.cl h4{font:500 1rem var(--f-display);margin:14px 0 2px;color:var(--accent)}
+.cl h4:first-child{margin-top:0}
+.cl h5{font-size:.9rem;margin:8px 0 0}
+.cl code{font:.82em var(--f-mono);background:var(--surface2);padding:1px 4px}
+.cl a{color:var(--accent)}
+.srch{display:flex;gap:8px;flex-wrap:wrap}
+.srch input{flex:1 1 220px;width:auto}
+.sres{display:flex;flex-direction:column;border:1px solid var(--line)}
+.sres .it{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.sres .it:last-child{border-bottom:0}
+.sres img,.sres .ph{width:32px;height:32px;object-fit:cover;background:var(--surface2);border:1px solid var(--line);image-rendering:pixelated;display:block}
+.sres .d{font-size:.8rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.added{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:.82rem;font-weight:600;padding:3px 2px 3px 8px;background:var(--ok-soft);color:var(--ok)}
+.chip button{border:0;background:none;padding:0 6px;color:inherit;font-size:1rem;line-height:1}
+.fbar{display:flex;gap:8px;flex-wrap:wrap}
+.fbar input{flex:1 1 auto}
+.sum button.pill{border:1px solid transparent;cursor:pointer}
+.sum button.pill[aria-pressed="true"]{border-color:currentColor;box-shadow:inset 0 -2px 0 currentColor}
+.p-add{background:var(--ok-soft);color:var(--ok)}
+.p-orphan{background:var(--warn-soft);color:var(--warn)}
+.badge{font:600 .68rem var(--f-body);padding:1px 6px;border-radius:2px;background:var(--warn-soft);color:var(--warn);letter-spacing:.03em}
+.facts{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.88rem}
+.facts span{white-space:nowrap}
+.facts b{font-variant-numeric:tabular-nums}
+.recs{display:flex;flex-direction:column;gap:8px}
+.recs h3{font:500 1rem var(--f-display);margin:0}
+.recs .info{margin:4px 0 0}
+.recs-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.sres .it3{grid-template-columns:32px minmax(0,1fr) auto auto}
+.sres a{color:var(--fg);text-decoration:none}.sres a:hover b{color:var(--accent)}
+button.x{border:0;background:none;padding:2px 6px;color:var(--muted);font-size:1.1rem;line-height:1}
+button.x:hover{color:var(--bad)}
+.p-jarok{background:var(--ok-soft);color:var(--ok)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Mod<span>Shift</span></h1>
+      <p class="tag" data-t="tagline"></p>
+    </div>
+    <button id="btnSettings" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 0h2v2.1a6 6 0 0 1 1.9.8l1.5-1.5 1.4 1.4-1.5 1.5c.4.6.6 1.2.8 1.9H16v2h-2.1a6 6 0 0 1-.8 1.9l1.5 1.5-1.4 1.4-1.5-1.5a6 6 0 0 1-1.9.8V16H7v-2.1a6 6 0 0 1-1.9-.8l-1.5 1.5-1.4-1.4 1.5-1.5A6 6 0 0 1 2.1 9H0V7h2.1c.2-.7.4-1.3.8-1.9L1.4 3.6l1.4-1.4 1.5 1.5c.6-.4 1.2-.6 1.9-.8V0Zm1 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg><span data-t="settings"></span></button>
+  </header>
+
+  <section class="step" id="s1">
+    <h2><span class="n">1</span><span data-t="s1"></span></h2>
+    <div class="drop" id="drop" tabindex="0">
+      <p data-t="drop"></p>
+      <div class="row-btns">
+        <button type="button" id="btnFiles" data-t="pickFiles"></button>
+        <button type="button" id="btnDir" data-t="pickDir"></button>
+      </div>
+      <input type="file" id="inFiles" accept=".jar" multiple hidden>
+      <input type="file" id="inDir" webkitdirectory multiple hidden>
+    </div>
+    <div class="files" id="filesBox" hidden>
+      <span id="filesCount"></span>
+      <button type="button" id="btnClear" data-t="clear"></button>
+      <div class="list" id="filesList"></div>
+    </div>
+    <div class="srch"><input type="text" id="addQ" data-tp="addPh" autocomplete="off"><button type="button" id="btnAddQ" data-t="search"></button></div>
+    <div class="sres" id="sres" hidden></div>
+    <div class="added" id="addedBox" hidden></div>
+  </section>
+
+  <section class="step" id="s2">
+    <h2><span class="n">2</span><span data-t="s2"></span></h2>
+    <div class="modes" role="radiogroup">
+      <label class="mode"><input type="radio" name="mode" id="m-update" value="update" checked><b data-t="m_update"></b><small data-t="m_update_d"></small></label>
+      <label class="mode"><input type="radio" name="mode" id="m-setver" value="setver"><b data-t="m_setver"></b><small data-t="m_setver_d"></small></label>
+      <label class="mode"><input type="radio" name="mode" id="m-both" value="both"><b data-t="m_both"></b><small data-t="m_both_d"></small></label>
+    </div>
+    <div class="grid2">
+      <label class="f" id="verWrap"><span data-t="targetVer"></span>
+        <select id="selVer"></select>
+        <input type="text" id="txtVer" placeholder="1.21.1" hidden>
+        <span class="chk"><input type="checkbox" id="chkSnap"><span data-t="snapshots"></span></span>
+      </label>
+      <label class="f"><span data-t="loader"></span>
+        <select id="selLoader">
+          <option value="auto" data-t="auto"></option>
+          <option value="fabric">Fabric</option>
+          <option value="neoforge">NeoForge</option>
+          <option value="forge">Forge</option>
+          <option value="quilt">Quilt</option>
+        </select>
+        <small data-t="loader_h"></small>
+      </label>
+    </div>
+    <p class="info" id="updInfo" data-t="target_info_update"></p>
+    <div class="row-btns"><button type="button" class="primary" id="btnAnalyze" data-t="analyze"></button><button type="button" id="btnCompat" data-t="compatBtn"></button><span class="info" id="cfState"></span></div>
+    <div class="prog" id="prog" hidden><span class="info" id="progTxt"></span><div class="bar"><i id="progBar"></i></div></div>
+    <div id="msgs" class="prog"></div>
+    <div id="compat" class="cmp" hidden></div>
+  </section>
+
+  <section class="step" id="s3" hidden>
+    <h2><span class="n">3</span><span data-t="s3"></span></h2>
+    <p class="info mono" id="detected"></p>
+    <div class="facts" id="facts"></div>
+    <div class="sum" id="sum"></div>
+    <div class="msg warn" id="stale" hidden data-t="needsAnalyze"></div>
+    <div id="conf" class="msg bad" hidden></div>
+    <div class="fbar"><input type="text" id="fq" data-tp="filterPh" autocomplete="off"><button type="button" class="sm" id="btnSelAll" data-t="selAll"></button><button type="button" class="sm" id="btnSelNone" data-t="selNone"></button></div>
+    <div class="list-mods" id="mods"></div>
+    <div class="recs" id="recs" hidden></div>
+    <div class="out">
+      <button type="button" class="primary" id="btnZip" data-t="zip"></button>
+      <button type="button" id="btnFolder" data-t="folder"></button>
+    </div>
+    <div id="outMsgs" class="prog"></div>
+  </section>
+
+  <footer data-t="privacy"></footer>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg">
+    <div class="dlg-h"><h2 data-t="settings"></h2><button type="button" id="btnClose" data-t="close"></button></div>
+    <label class="f"><span data-t="cfKey"></span><input type="password" id="setKey" autocomplete="off" spellcheck="false"><small data-t="cfKey_h"></small></label>
+    <label class="f"><span data-t="cfProxy"></span><input type="url" id="setProxy" placeholder="https://mod-proxy.adin.workers.dev" spellcheck="false"><small data-t="cfProxy_h"></small></label>
+    <div class="grid2">
+      <label class="f"><span data-t="priority"></span><select id="setPrio"><option value="mr" data-t="pr_mr"></option><option value="cf" data-t="pr_cf"></option></select></label>
+      <label class="f"><span data-t="channel"></span><select id="setChan"><option value="release" data-t="ch_release"></option><option value="beta" data-t="ch_beta"></option><option value="alpha" data-t="ch_alpha"></option></select></label>
+      <label class="f"><span data-t="lang"></span><select id="setLang"><option value="tr">Türkçe</option><option value="en">English</option></select></label>
+    </div>
+    <span class="chk"><input type="checkbox" id="setDeps"><span data-t="autoDeps"></span></span>
+    <details>
+      <summary data-t="worker"></summary>
+      <p class="info" data-t="worker_h"></p>
+      <button type="button" id="btnCopy" data-t="copy"></button>
+      <pre class="code" id="workerCode"></pre>
+    </details>
+  </div>
+</dialog>
+
+<dialog id="clDlg">
+  <div class="dlg">
+    <div class="dlg-h"><h2 id="clTitle"></h2><button type="button" id="clClose" data-t="close"></button></div>
+    <div class="row-btns"><button type="button" class="sm" id="clTr" data-t="translate"></button><span class="info" id="clInfo"></span></div>
+    <div class="cl" id="clBody"></div>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ---------- i18n ---------- */
+const I18N={
+tr:{tagline:"Mod .jar dosyalarını bırak. En güncel ya da seçtiğin Minecraft sürümüne uygun versiyonları Modrinth ve CurseForge'dan toplanıp sana klasör olarak verilir.",
+settings:"Ayarlar",s1:"Modları ekle",drop:".jar dosyalarını veya mods klasörünü buraya sürükle",pickFiles:"Dosya seç",pickDir:"Klasör seç",clear:"Temizle",nFiles:"{n} mod dosyası",
+s2:"Ne yapılsın?",m_update:"Güncelle",m_update_d:"Mevcut Minecraft sürümünde kal, her modun en yeni versiyonunu al.",m_setver:"Sürüm ayarla",m_setver_d:"Seçilen sürüme taşı. Zaten uyumlu olan modlara dokunma.",m_both:"Sürüm ayarla + güncelle",m_both_d:"Seçilen sürüme taşı ve her modun o sürümdeki en yeni versiyonunu al.",
+targetVer:"Hedef Minecraft sürümü",snapshots:"Snapshot'ları göster",loader:"Loader",auto:"Otomatik (tespit edilen)",loader_h:"Farklı bir loader seçersen modların o loader versiyonları aranır.",
+target_info_update:"Hedef sürüm, modlarından otomatik tespit edilir.",analyze:"Analiz et",s3:"Sonuç",detected:"Mevcut paket: {v} · {l}  →  Hedef: {tv} · {tl}",
+zip:"ZIP olarak indir",folder:"Klasöre kaydet",
+st_update:"Güncellenecek",st_dep:"Bağımlılık eklenecek",st_keep:"Uyumlu, korunuyor",st_current:"Zaten güncel",st_manual:"Elle indirilmeli",st_missing:"Hedef sürümde yok",st_unknown:"Tanınamadı",st_dup:"Tekrar eden dosya",
+n_last:"Son desteklediği sürüm: {v}",n_onlyPre:"Bu sürüm için sadece {c} var ({n})",n_noLast:"Bu loader için hiç versiyonu yok",n_name:"isimle eşleşti",n_unknown:"Orijinal dosya olduğu gibi eklenebilir",n_manual:"Yazar üçüncü parti indirmeye izin vermiyor, linkten indir",n_depOf:"Şunun için gerekli: {m}",
+cfKey:"CurseForge API anahtarı",cfKey_h:"console.curseforge.com adresinden ücretsiz alınır. Sadece bu tarayıcıda saklanır.",cfProxy:"Aracı sunucu adresi (isteğe bağlı)",cfProxy_h:"CurseForge tarayıcıdan gelen istekleri engellerse kendi Cloudflare Worker adresini gir. O zaman anahtar burada değil Worker'da durur.",
+priority:"Kaynak önceliği",pr_mr:"Önce Modrinth",pr_cf:"Önce CurseForge",channel:"Sürüm kanalı",ch_release:"Sadece kararlı (release)",ch_beta:"Beta dahil",ch_alpha:"Alpha dahil",autoDeps:"Eksik bağımlılıkları otomatik ekle",lang:"Dil",
+worker:"Cloudflare Worker kodu (aracı sunucu)",worker_h:"workers.cloudflare.com → Create Worker → bu kodu yapıştır → Deploy. Sonra Settings > Variables and Secrets kısmına CF_KEY adında Secret olarak API anahtarını ekle ve Worker adresini yukarıdaki alana yaz.",copy:"Kopyala",copied:"Kopyalandı",close:"Kapat",
+p_read:"Dosyalar okunuyor",p_mr:"Modrinth'te aranıyor",p_cf:"CurseForge'da aranıyor",p_name:"Tanınmayanlar isimle aranıyor",p_plan:"Versiyonlar kontrol ediliyor",p_deps:"Bağımlılıklar çözülüyor",p_dl:"İndiriliyor",p_zip:"ZIP hazırlanıyor",
+done:"{n} dosya hazır.",doneManual:"{m} mod elle indirilmeli, linkleri aşağıda ve rapor.txt içinde.",saved:"\"{f}\" klasörüne {n} dosya kaydedildi.",
+e_noFiles:"Önce mod dosyası ekle.",e_noTarget:"Hedef sürüm belirlenemedi. \"Sürüm ayarla\" modunda sürümü elle seç.",e_cors:"CurseForge'a tarayıcıdan bağlanılamadı. Ayarlardan aracı sunucu adresi ekle ya da sadece Modrinth ile devam et.",e_cfkey:"CurseForge API anahtarı geçersiz veya yetkisiz.",e_net:"Bağlantı hatası: {m}",e_tags:"Sürüm listesi alınamadı, sürümü elle yaz.",e_noSel:"İndirilecek mod seçili değil.",e_noFolder:"Bu tarayıcı klasöre kaydetmeyi desteklemiyor (Chrome veya Edge kullan). ZIP indirmeyi deneyebilirsin.",
+cfOn:"CurseForge açık",cfOff:"CurseForge kapalı (Ayarlar'dan anahtar ekle)",manualList:"Elle indirilecekler",dlFailed:"İndirme başarısız: {r}",hashBad:"dosya doğrulanamadı",
+privacy:"Mod dosyaların bilgisayarından çıkmaz. Sadece dosyaların parmak izleri (hash) Modrinth ve CurseForge'a gönderilir.",needsAnalyze:"Ayarları değiştirdin. Sonucu güncellemek için tekrar analiz et.",unknownVer:"?",
+compatBtn:"Hangi sürüme geçebilirim?",compatTitle:"{l} için sürüm uyumluluğu ({n} mod)",compatPick:"Bu sürümü seç",compatMiss:"Eksik: {m}",compatAll:"Tüm modlar mevcut",p_compat:"Sürüm desteği kontrol ediliyor",
+e_v2:"Modrinth eski API'sini (v2) kapatmış görünüyor. Uygulamanın güncellenmesi gerekiyor.",
+curTag:"mevcut",selAll:"Görünenleri seç",selNone:"Seçimi kaldır",
+st_jarok:"Jar'a göre uyumlu",recRefresh:"↻ Önerileri yenile",recLoading:"Yükleniyor...",recHide:"Bu öneriyi gizle",recOptTitle:"Modlarının isteğe bağlı eklentileri",recPopTitle:"Paketine benzeyen popüler modlar ({v} · {l})",recNone:"Şu an öneri yok. Yenilemeyi dene.",
+r_st_update:"Güncellendi",r_st_add:"Eklendi",r_st_dep:"Bağımlılık eklendi",r_st_keep:"Korundu",r_st_current:"Zaten güncel",r_st_jarok:"Orijinal dosya (jar'a göre uyumlu)",r_st_unknown:"Orijinal dosya",n_mcOk:"Jar bilgisine göre {v} ile uyumlu",n_mcNo:"Jar bilgisine göre {v} ile uyumsuz (istediği: {s})",addPh:"Modrinth'te mod ara ve listeye ekle",search:"Ara",addBtn:"Ekle",added:"Eklendi",noRes:"Sonuç bulunamadı",st_add:"Eklenecek",n_added:"Elle eklendi",filterPh:"Listede ara",cfgKeep:"+ {n} ayar dosyası (config, options.txt) aynen korunacak",
+st_orphan:"Gereksiz olabilir",orphan:"Hiçbir mod bu kütüphaneye ihtiyaç duymuyor, silebilirsin",wrongLoader:"Bu dosya bir {l} modu, bu pakette çalışmaz",wrongFixed:"Yanlış loader dosyasıydı, doğru versiyonu indirilecek",notMod:"Mod dosyası değil",badJar:"Dosya bozuk veya yarım inmiş",
+recsTitle:"Önerilen eklentiler",recFor:"{m} için önerilir",f_dl:"İndirilecek: <b>{n}</b> dosya, <b>{s}</b>",f_total:"Paket boyutu: <b>{a}</b> → <b>{b}</b>",f_java:"<b>Java {j}</b> gerekir",f_javaEst:" (tahmini)",
+loaderNeed:"Bu paket için en az {l} {v} kurulu olmalı.",loaderLink:"Kurulum sayfası",r_loader:"Gerekli loader",r_java:"Gerekli Java",r_orphan:"Gereksiz olabilecek kütüphaneler",r_cfg:"Korunan ayar dosyaları",conflictTitle:"Birlikte çalışmayan modlar var:",conflictWith:"Şununla uyumsuz: {m}",
+changes:"Değişiklikler",clLoading:"Değişiklik notları yükleniyor...",clNone:"Bu versiyon için değişiklik notu yazılmamış.",clCount:"{n} versiyonun notları",translate:"Türkçeye çevir",showOrig:"Orijinali göster",trWorking:"Çevriliyor...",trFail:"Çeviri yapılamadı.",openGT:"Google Çeviri'de aç",
+r_title:"ModShift raporu",r_date:"Tarih",r_mode:"İşlem",r_target:"Hedef",r_files:"Klasöre eklenenler",r_manual:"Elle indirilmesi gerekenler",r_missing:"Hedef sürümde bulunmayanlar",r_unknown:"Tanınamayanlar (eklenmedi)"},
+en:{tagline:"Drop your mod .jar files. The latest versions, or the ones matching the Minecraft version you pick, are collected from Modrinth and CurseForge and handed back as a folder.",
+settings:"Settings",s1:"Add mods",drop:"Drag .jar files or your mods folder here",pickFiles:"Choose files",pickDir:"Choose folder",clear:"Clear",nFiles:"{n} mod files",
+s2:"What should happen?",m_update:"Update",m_update_d:"Stay on the current Minecraft version and get the newest build of every mod.",m_setver:"Set version",m_setver_d:"Move to the selected version. Mods that already support it are left alone.",m_both:"Set version + update",m_both_d:"Move to the selected version and get each mod's newest build for it.",
+targetVer:"Target Minecraft version",snapshots:"Show snapshots",loader:"Loader",auto:"Automatic (detected)",loader_h:"Pick a different loader to look for that loader's builds of your mods.",
+target_info_update:"The target version is detected from your mods.",analyze:"Analyze",s3:"Result",detected:"Current pack: {v} · {l}  →  Target: {tv} · {tl}",
+zip:"Download as ZIP",folder:"Save to folder",
+st_update:"Will update",st_dep:"Dependency added",st_keep:"Compatible, kept",st_current:"Already latest",st_manual:"Manual download",st_missing:"Not on target",st_unknown:"Not recognized",st_dup:"Duplicate file",
+n_last:"Last supported version: {v}",n_onlyPre:"Only {c} builds exist for this version ({n})",n_noLast:"No builds for this loader",n_name:"matched by name",n_unknown:"The original file can be included as is",n_manual:"The author blocks third-party downloads, use the link",n_depOf:"Required by: {m}",
+cfKey:"CurseForge API key",cfKey_h:"Free from console.curseforge.com. Stored only in this browser.",cfProxy:"Proxy address (optional)",cfProxy_h:"If CurseForge blocks browser requests, enter your own Cloudflare Worker address. The key then lives in the Worker instead.",
+priority:"Source priority",pr_mr:"Modrinth first",pr_cf:"CurseForge first",channel:"Release channel",ch_release:"Stable only (release)",ch_beta:"Include beta",ch_alpha:"Include alpha",autoDeps:"Add missing dependencies automatically",lang:"Language",
+worker:"Cloudflare Worker code (proxy)",worker_h:"workers.cloudflare.com → Create Worker → paste this code → Deploy. Then add your API key under Settings > Variables and Secrets as a Secret named CF_KEY, and enter the Worker address above.",copy:"Copy",copied:"Copied",close:"Close",
+p_read:"Reading files",p_mr:"Searching Modrinth",p_cf:"Searching CurseForge",p_name:"Searching unknown mods by name",p_plan:"Checking versions",p_deps:"Resolving dependencies",p_dl:"Downloading",p_zip:"Building ZIP",
+done:"{n} files ready.",doneManual:"{m} mods need a manual download, links below and in report.txt.",saved:"Saved {n} files to \"{f}\".",
+e_noFiles:"Add some mod files first.",e_noTarget:"Could not detect a target version. Pick one in \"Set version\" mode.",e_cors:"Could not reach CurseForge from the browser. Add a proxy address in Settings or continue with Modrinth only.",e_cfkey:"The CurseForge API key is invalid or not authorized.",e_net:"Connection error: {m}",e_tags:"Could not load the version list, type the version.",e_noSel:"No mods selected for download.",e_noFolder:"This browser can't save to a folder (use Chrome or Edge). Try the ZIP download.",
+cfOn:"CurseForge on",cfOff:"CurseForge off (add a key in Settings)",manualList:"Download manually",dlFailed:"Download failed: {r}",hashBad:"file check failed",
+privacy:"Your mod files never leave your computer. Only their fingerprints (hashes) are sent to Modrinth and CurseForge.",needsAnalyze:"You changed the options. Analyze again to refresh the result.",unknownVer:"?",
+compatBtn:"Which version can I move to?",compatTitle:"Version support for {l} ({n} mods)",compatPick:"Pick this version",compatMiss:"Missing: {m}",compatAll:"All mods available",p_compat:"Checking version support",
+e_v2:"Modrinth seems to have shut down its old API (v2). The app needs an update.",
+curTag:"current",selAll:"Select shown",selNone:"Deselect shown",
+st_jarok:"Compatible per jar",recRefresh:"↻ Refresh suggestions",recLoading:"Loading...",recHide:"Hide this suggestion",recOptTitle:"Optional add-ons for your mods",recPopTitle:"Popular mods similar to your pack ({v} · {l})",recNone:"No suggestions right now. Try refreshing.",
+r_st_update:"Updated",r_st_add:"Added",r_st_dep:"Dependency added",r_st_keep:"Kept",r_st_current:"Already latest",r_st_jarok:"Original file (compatible per jar)",r_st_unknown:"Original file",n_mcOk:"Compatible with {v} according to the jar",n_mcNo:"Not compatible with {v} according to the jar (wants: {s})",addPh:"Search Modrinth and add a mod",search:"Search",addBtn:"Add",added:"Added",noRes:"No results",st_add:"Will add",n_added:"Added by hand",filterPh:"Search the list",cfgKeep:"+ {n} settings files (config, options.txt) kept as is",
+st_orphan:"Possibly unneeded",orphan:"No mod needs this library, you can remove it",wrongLoader:"This file is a {l} mod and won't work in this pack",wrongFixed:"This was a wrong-loader file, the right build will be downloaded",notMod:"Not a mod file",badJar:"The file is broken or partially downloaded",
+recsTitle:"Suggested add-ons",recFor:"Suggested for {m}",f_dl:"To download: <b>{n}</b> files, <b>{s}</b>",f_total:"Pack size: <b>{a}</b> → <b>{b}</b>",f_java:"Needs <b>Java {j}</b>",f_javaEst:" (estimate)",
+loaderNeed:"This pack needs at least {l} {v}.",loaderLink:"Install page",r_loader:"Required loader",r_java:"Required Java",r_orphan:"Possibly unneeded libraries",r_cfg:"Settings files kept",conflictTitle:"Some mods don't work together:",conflictWith:"Incompatible with: {m}",
+changes:"Changes",clLoading:"Loading changelogs...",clNone:"No changelog was written for this version.",clCount:"Notes for {n} versions",translate:"Translate to English",showOrig:"Show original",trWorking:"Translating...",trFail:"Translation failed.",openGT:"Open in Google Translate",
+r_title:"ModShift report",r_date:"Date",r_mode:"Action",r_target:"Target",r_files:"Added to the folder",r_manual:"Need a manual download",r_missing:"Not available on target",r_unknown:"Not recognized (not added)"}};
+
+/* ---------- state & settings ---------- */
+const $=id=>document.getElementById(id);
+const S={files:[],entries:[],tags:[],tagIdx:{},identified:false,busy:false,pack:{},ctx:null,mrProj:{},cfProj:{},vcache:{},cfBroken:false,stale:false,lastManual:[],added:[],configs:[],recs:[],filter:null,java:{},userInc:{},pop:[],popOffset:0,popTotal:0};
+const DEF={cfKey:"",cfProxy:"",priority:"mr",channel:"release",autoDeps:true,lang:"en"};
+let SET=Object.assign({},DEF);
+try{Object.assign(SET,JSON.parse(localStorage.getItem("modshift")||"{}"))}catch(_){}
+function saveSet(){try{localStorage.setItem("modshift",JSON.stringify(SET))}catch(_){}}
+S.dismiss=new Set(Array.isArray(SET.dismiss)?SET.dismiss:[]);
+function dismissRec(id){S.dismiss.add(id);SET.dismiss=[...S.dismiss].slice(-300);saveSet();S.recs=S.recs.filter(r=>r.p.id!==id);S.pop=S.pop.filter(p=>p.id!==id);renderRecs()}
+function t(k,v){let s=(I18N[SET.lang]||I18N.tr)[k]??I18N.tr[k]??k;if(v)for(const x in v)s=s.split("{"+x+"}").join(v[x]);return s}
+function applyI18n(){document.documentElement.lang=SET.lang;document.querySelectorAll("[data-t]").forEach(el=>el.textContent=t(el.dataset.t));document.querySelectorAll("[data-tp]").forEach(el=>el.placeholder=t(el.dataset.tp));updateCfState();renderFiles();fillVersions();if(S.entries.length)renderResults()}
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const enc=encodeURIComponent;
+const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const cfOn=()=>!!(SET.cfKey||SET.cfProxy)&&!S.cfBroken;
+const LOADERS=["fabric","neoforge","forge","quilt"];
+const LNAME={fabric:"Fabric",neoforge:"NeoForge",forge:"Forge",quilt:"Quilt"};
+const CF_LOADER={forge:1,fabric:4,quilt:5,neoforge:6};
+function updateCfState(){$("cfState").textContent=(SET.cfKey||SET.cfProxy)?t("cfOn"):t("cfOff")}
+
+/* ---------- helpers ---------- */
+async function pool(items,n,fn){let i=0;const run=async()=>{while(i<items.length){const k=i++;await fn(items[k],k)}};await Promise.all(Array.from({length:Math.min(n,items.length)},run))}
+async function sha1hex(buf){const h=await crypto.subtle.digest("SHA-1",buf);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("")}
+function cfFingerprint(bytes){
+  const buf=new Uint8Array(bytes.length);let n=0;
+  for(let i=0;i<bytes.length;i++){const b=bytes[i];if(b!==9&&b!==10&&b!==13&&b!==32)buf[n++]=b}
+  const m=0x5bd1e995;let h=(1^n)>>>0,i=0;
+  while(n-i>=4){let k=buf[i]|(buf[i+1]<<8)|(buf[i+2]<<16)|(buf[i+3]<<24);k=Math.imul(k,m);k^=k>>>24;k=Math.imul(k,m);h=Math.imul(h,m)^k;i+=4}
+  switch(n-i){case 3:h^=buf[i+2]<<16;case 2:h^=buf[i+1]<<8;case 1:h^=buf[i];h=Math.imul(h,m)}
+  h^=h>>>13;h=Math.imul(h,m);h^=h>>>15;return h>>>0;
+}
+function vIdx(v){return v in S.tagIdx?S.tagIdx[v]:1e6}
+function newest(list){return [...(list||[])].sort((a,b)=>vIdx(a)-vIdx(b))[0]}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function mr(path,opt={}){
+  for(let a=0;a<3;a++){
+    const r=await fetch("https://api.modrinth.com/v2"+path,{method:opt.method||"GET",headers:opt.body?{"Content-Type":"application/json"}:{},body:opt.body?JSON.stringify(opt.body):undefined});
+    if(r.status===429){await sleep((+(r.headers.get("X-Ratelimit-Reset"))||5)*1000);continue}
+    if(r.status===404)return null;
+    if(r.status===410)throw new Error(t("e_v2"));
+    if(!r.ok)throw new Error("Modrinth "+r.status);
+    return r.json();
+  }
+  throw new Error("Modrinth 429");
+}
+async function cf(path,opt={}){
+  const proxy=SET.cfProxy.trim().replace(/\/+$/,"");
+  const base=proxy?proxy+"/v1":"https://api.curseforge.com/v1";
+  const h={"Accept":"application/json"};if(opt.body)h["Content-Type"]="application/json";if(!proxy)h["x-api-key"]=SET.cfKey.trim();
+  let r;
+  try{r=await fetch(base+path,{method:opt.method||"GET",headers:h,body:opt.body?JSON.stringify(opt.body):undefined})}
+  catch(_){S.cfBroken=true;throw new Error("cors")}
+  if(r.status===404)return null;
+  if(r.status===401||r.status===403){S.cfBroken=true;throw new Error("cfkey")}
+  if(!r.ok)throw new Error("CurseForge "+r.status);
+  return r.json();
+}
+function cfErr(e){if(e.message==="cors")addMsg(t("e_cors"),"warn");else if(e.message==="cfkey")addMsg(t("e_cfkey"),"warn");else addMsg(t("e_net",{m:e.message}),"warn")}
+
+/* ---------- normalizers ---------- */
+function mrVer(v){const f=v.files.find(x=>x.primary)||v.files[0];return{id:v.id,number:v.version_number,gv:v.game_versions||[],loaders:v.loaders||[],type:v.version_type,date:v.date_published,deps:(v.dependencies||[]).filter(d=>d.dependency_type==="required"),inc:(v.dependencies||[]).filter(d=>d.dependency_type==="incompatible"&&d.project_id).map(d=>d.project_id),opt:(v.dependencies||[]).filter(d=>d.dependency_type==="optional"&&d.project_id).map(d=>d.project_id),file:f&&{url:f.url,name:f.filename,sha1:f.hashes&&f.hashes.sha1,size:f.size}}}
+function mrProjN(p){return{id:p.id||p.project_id,slug:p.slug,title:p.title,icon:p.icon_url,url:"https://modrinth.com/mod/"+p.slug,lib:(p.categories||[]).concat(p.display_categories||[],p.additional_categories||[]).includes("library"),gv:p.game_versions||p.versions||[],loaders:p.loaders||(p.categories||[]).filter(c=>LOADERS.includes(c)),cats:[...new Set((p.categories||[]).concat(p.display_categories||[]))].filter(c=>!LOADERS.includes(c)&&!["library","minecraft"].includes(c)),downloads:p.downloads||0,desc:p.description||"",src:"mr"}}
+const isMc=s=>/^\d+\.\d+(\.\d+)?([-_].+)?$/.test(s);
+function cfFile(f){const gv=(f.gameVersions||[]);const sha=(f.hashes||[]).find(h=>h.algo===1);return{id:f.id,number:f.displayName||f.fileName,gv:gv.filter(isMc),loaders:gv.map(x=>x.toLowerCase()).filter(x=>LOADERS.includes(x)),type:["","release","beta","alpha"][f.releaseType]||"release",date:f.fileDate,deps:(f.dependencies||[]).filter(d=>d.relationType===3).map(d=>({cfModId:d.modId})),inc:(f.dependencies||[]).filter(d=>d.relationType===5).map(d=>d.modId),opt:[],file:{url:f.downloadUrl,name:f.fileName,sha1:sha&&sha.value,size:f.fileLength}}}
+function cfProjN(m){return{id:m.id,slug:m.slug,title:m.name,lib:(m.categories||[]).some(c=>/librar/i.test(c.name||"")),icon:m.logo&&m.logo.thumbnailUrl,url:(m.links&&m.links.websiteUrl)||("https://www.curseforge.com/minecraft/mc-mods/"+m.slug),allowDist:m.allowModDistribution!==false,latest:m.latestFilesIndexes||[],src:"cf"}}
+async function mrLoadProjects(ids){ids=ids.filter(id=>id&&!S.mrProj[id]);for(let i=0;i<ids.length;i+=100){const r=await mr("/projects?ids="+enc(JSON.stringify(ids.slice(i,i+100))))||[];for(const p of r)S.mrProj[p.id]=mrProjN(p)}}
+async function cfLoadMods(ids){ids=ids.filter(id=>id&&!S.cfProj[id]);if(!ids.length)return;const r=await cf("/mods",{method:"POST",body:{modIds:ids}});for(const m of (r&&r.data)||[])S.cfProj[m.id]=cfProjN(m)}
+
+/* ---------- jar metadata ---------- */
+async function readMeta(buf){
+  const m={deps:[]};let zip;try{zip=await JSZip.loadAsync(buf)}catch(_){m.bad=true;return m}
+  const tomlDeps=s=>{const i=s.indexOf("[[dependencies");if(i<0)return[];const out=[],re=/modId\s*=\s*["']([^"']+)["']/g,d=s.slice(i);let r;while((r=re.exec(d)))out.push(r[1]);return out};
+  const tomlReq=(s,id)=>{const r=new RegExp("modId\\s*=\\s*[\"']"+id+"[\"'][\\s\\S]*?versionRange\\s*=\\s*[\"']([^\"']+)[\"']").exec(s);return r?r[1]:undefined};
+  const joinV=v=>Array.isArray(v)?v.join(" "):v;
+  const pick=(s,k)=>{const r=new RegExp('"'+k+'"\\s*:\\s*"([^"]*)"').exec(s);return r?r[1]:undefined};
+  const toml=(s,k)=>{const r=new RegExp("^\\s*"+k+"\\s*=\\s*[\"']([^\"']+)[\"']","m").exec(s);return r?r[1]:undefined};
+  let f;
+  if((f=zip.file("fabric.mod.json"))){const s=await f.async("string");m.loader="fabric";try{const j=JSON.parse(s);m.modId=j.id;m.name=j.name||j.id;m.version=j.version;m.deps=Object.keys(j.depends||{}).concat(Object.keys(j.recommends||{}),Object.keys(j.suggests||{}));m.provides=(j.provides||[]).filter(x=>typeof x==="string");m.loaderReq=joinV((j.depends||{}).fabricloader);m.mcReq=(j.depends||{}).minecraft}catch(_){m.modId=pick(s,"id");m.name=pick(s,"name")||m.modId;m.version=pick(s,"version");m.loaderReq=pick(s,"fabricloader")}}
+  else if((f=zip.file("quilt.mod.json"))){const s=await f.async("string");m.loader="quilt";try{const q=JSON.parse(s).quilt_loader||{};m.modId=q.id;m.name=(q.metadata&&q.metadata.name)||q.id;m.version=q.version;const ds=(q.depends||[]).map(d=>typeof d==="string"?{id:d}:d);m.deps=ds.map(d=>d.id).filter(Boolean);const ql=ds.find(d=>d.id==="quilt_loader");m.loaderReq=ql&&joinV(ql.versions);const mc=ds.find(d=>d.id==="minecraft");m.mcReq=mc&&mc.versions}catch(_){m.modId=pick(s,"id")}}
+  else if((f=zip.file("META-INF/neoforge.mods.toml"))){const s=await f.async("string");m.loader="neoforge";m.modId=toml(s,"modId");m.name=toml(s,"displayName")||m.modId;m.version=toml(s,"version");m.deps=tomlDeps(s);m.loaderReq=tomlReq(s,"neoforge");m.mcReq=tomlReq(s,"minecraft");m.mcMaven=true}
+  else if((f=zip.file("META-INF/mods.toml"))){const s=await f.async("string");m.loader="forge";m.modId=toml(s,"modId");m.name=toml(s,"displayName")||m.modId;m.version=toml(s,"version");m.deps=tomlDeps(s);m.loaderReq=tomlReq(s,"forge");m.mcReq=tomlReq(s,"minecraft");m.mcMaven=true}
+  else m.none=true;
+  if(m.version&&m.version.includes("${"))m.version=undefined;
+  m.deps=(m.deps||[]).filter(d=>d&&d!==m.modId);
+  return m;
+}
+
+/* ---------- identify ---------- */
+async function identify(){
+  const ents=S.files.map((f,i)=>({uid:"f"+i,file:f,fileName:f.name,meta:{}}));
+  let done=0;setProg(t("p_read"),0);
+  const wantFp=!!(SET.cfKey||SET.cfProxy);
+  await pool(ents,4,async e=>{const buf=await e.file.arrayBuffer();e.sha1=await sha1hex(buf);e.meta=await readMeta(buf);if(wantFp)e.fp=cfFingerprint(new Uint8Array(buf));setProg(t("p_read"),++done/ents.length*30)});
+  const order=SET.priority==="cf"?["cf","mr"]:["mr","cf"];
+  for(const src of order){
+    const left=ents.filter(e=>!e.src);if(!left.length)break;
+    if(src==="mr"){setProg(t("p_mr"),35);await mrIdentify(left)}
+    else if(cfOn()){setProg(t("p_cf"),45);try{await cfIdentify(left)}catch(err){cfErr(err)}}
+  }
+  const left=ents.filter(e=>!e.src);done=0;
+  await pool(left,3,async e=>{try{await nameSearch(e)}catch(_){}setProg(t("p_name"),55+(++done/Math.max(1,left.length))*15)});
+  ents.push(...S.added);
+  const groups={};
+  for(const e of ents){e.dup=false;if(!e.src)continue;(groups[e.src+":"+e.pid]=groups[e.src+":"+e.pid]||[]).push(e)}
+  for(const g of Object.values(groups))if(g.length>1){g.sort((a,b)=>new Date((b.cur&&b.cur.date)||0)-new Date((a.cur&&a.cur.date)||0));g.slice(1).forEach(e=>e.dup=true)}
+  const lc={},gc={};
+  for(const e of ents){const l=e.meta.loader||(e.cur&&e.cur.loaders.find(x=>LOADERS.includes(x)));if(l)lc[l]=(lc[l]||0)+1;if(e.cur)for(const v of new Set(e.cur.gv))gc[v]=(gc[v]||0)+1}
+  const top=o=>Object.keys(o).sort((a,b)=>o[b]-o[a]||vIdx(a)-vIdx(b))[0];
+  S.pack={loader:top(lc)||"fabric",version:top(gc)||null};
+  S.entries=ents;S.identified=true;
+  fillVersions();
+}
+async function mrIdentify(list){
+  const res=await mr("/version_files",{method:"POST",body:{hashes:list.map(e=>e.sha1),algorithm:"sha1"}})||{};
+  for(const e of list){const v=res[e.sha1];if(v){e.src="mr";e.match="hash";e.pid=v.project_id;e.cur=mrVer(v)}}
+  await mrLoadProjects(list.filter(e=>e.src==="mr").map(e=>e.pid));
+  for(const e of list)if(e.src==="mr")e.project=S.mrProj[e.pid]||{id:e.pid,title:e.fileName,url:"https://modrinth.com/project/"+e.pid,gv:[],src:"mr"};
+}
+async function cfIdentify(list){
+  const res=await cf("/fingerprints/432",{method:"POST",body:{fingerprints:list.map(e=>e.fp)}});
+  const by={};for(const x of (res&&res.data&&res.data.exactMatches)||[])by[x.file.fileFingerprint]=x;
+  for(const e of list){const x=by[e.fp];if(x){e.src="cf";e.match="hash";e.pid=x.id;e.cur=cfFile(x.file)}}
+  await cfLoadMods(list.filter(e=>e.src==="cf").map(e=>e.pid));
+  for(const e of list)if(e.src==="cf")e.project=S.cfProj[e.pid]||{id:e.pid,title:e.fileName,url:"https://www.curseforge.com/minecraft/mc-mods",allowDist:true,latest:[],src:"cf"};
+}
+function pickHit(hits,e,slugOf,titleOf){const ids=[e.meta.modId,e.meta.name].filter(Boolean).map(norm).filter(Boolean);if(!ids.length)return null;return (hits||[]).find(h=>ids.includes(norm(slugOf(h)))||ids.includes(norm(titleOf(h))))}
+async function nameSearch(e){
+  const q=e.meta.name||e.meta.modId;if(!q)return;
+  const facets=[["project_type:mod"]];if(e.meta.loader)facets.push(["categories:"+e.meta.loader]);
+  const r=await mr("/search?limit=5&query="+enc(q)+"&facets="+enc(JSON.stringify(facets)));
+  const h=pickHit(r&&r.hits,e,x=>x.slug,x=>x.title);
+  if(h){e.src="mr";e.match="name";e.pid=h.project_id;e.project=S.mrProj[h.project_id]||(S.mrProj[h.project_id]=mrProjN(h));return}
+  if(cfOn()){try{const r2=await cf("/mods/search?gameId=432&classId=6&pageSize=5&searchFilter="+enc(q));const h2=pickHit(r2&&r2.data,e,x=>x.slug,x=>x.name);if(h2){e.src="cf";e.match="name";e.pid=h2.id;e.project=S.cfProj[h2.id]||(S.cfProj[h2.id]=cfProjN(h2))}}catch(_){}}
+}
+
+/* ---------- plan ---------- */
+function channels(){return SET.channel==="alpha"?["release","beta","alpha"]:SET.channel==="beta"?["release","beta"]:["release"]}
+async function versionsFor(src,pid,ctx){
+  const key=src+":"+pid+":"+ctx.loader+":"+ctx.target;
+  if(S.vcache[key])return S.vcache[key];
+  let list=[];
+  if(src==="mr"){
+    const r=await mr("/project/"+pid+"/version?include_changelog=false&loaders="+enc(JSON.stringify(ctx.okLoaders))+"&game_versions="+enc(JSON.stringify([ctx.target])))||[];
+    list=r.map(mrVer);
+  }else{
+    for(const l of ctx.okLoaders){
+      const r=await cf("/mods/"+pid+"/files?pageSize=50&gameVersion="+enc(ctx.target)+"&modLoaderType="+CF_LOADER[l]);
+      list=((r&&r.data)||[]).map(cfFile).filter(v=>v.gv.includes(ctx.target));
+      if(list.length)break;
+    }
+  }
+  list.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return S.vcache[key]=list;
+}
+function lastSupported(e,ctx){
+  const p=e.project||{};
+  if(e.src==="mr")return newest(p.gv)||null;
+  const ids=ctx.okLoaders.map(l=>CF_LOADER[l]);
+  return newest((p.latest||[]).filter(x=>ids.includes(x.modLoader)).map(x=>x.gameVersion))||null;
+}
+async function planOne(e,ctx){
+  if(e.dup)return{st:"dup"};
+  if(!e.src)return{st:"unknown"};
+  const cur=e.cur;
+  const curOk=cur&&cur.gv.includes(ctx.target)&&cur.loaders.some(l=>ctx.okLoaders.includes(l));
+  if(ctx.mode==="setver"&&curOk)return{st:"keep",ver:cur};
+  let list=[],best=e.batch||null;
+  if(!best){
+    try{list=await versionsFor(e.src,e.pid,ctx)}catch(err){if(e.src==="cf")cfErr(err);return{st:"missing",note:t("e_net",{m:err.message})}}
+    best=list.find(v=>ctx.allowed.includes(v.type));
+  }
+  if(!best){
+    if(curOk)return{st:"keep",ver:cur,note:list.length?t("n_onlyPre",{c:list[0].type,n:list[0].number}):""};
+    if(list.length)return{st:"missing",note:t("n_onlyPre",{c:list[0].type,n:list[0].number})};
+    const last=lastSupported(e,ctx);
+    return{st:"missing",note:last?t("n_last",{v:last}):t("n_noLast")};
+  }
+  if(cur&&best.id===cur.id)return{st:"current",ver:cur};
+  if(e.src==="cf"&&(!best.file.url||(e.project&&e.project.allowDist===false)))return{st:"manual",ver:best,note:t("n_manual")};
+  return{st:"update",ver:best};
+}
+async function plan(){
+  const mode=document.querySelector("input[name=mode]:checked").value;
+  const loader=$("selLoader").value==="auto"?S.pack.loader:$("selLoader").value;
+  const picked=$("txtVer").hidden?$("selVer").value:$("txtVer").value.trim();
+  const target=mode==="update"?S.pack.version:picked;
+  if(!target)throw new Error(t("e_noTarget"));
+  const ctx={mode,loader,target,okLoaders:loader==="quilt"?["quilt","fabric"]:[loader],allowed:channels()};
+  S.ctx=ctx;
+  S.entries=S.entries.filter(e=>!e.isDep);
+  let done=0;const base=S.entries;
+  base.forEach(e=>e.batch=undefined);
+  const mrHash=base.filter(e=>e.src==="mr"&&e.match==="hash"&&!e.dup);
+  if(mrHash.length){
+    setProg(t("p_plan"),72);
+    try{
+      const r=await mr("/version_files/update",{method:"POST",body:{hashes:mrHash.map(e=>e.sha1),algorithm:"sha1",loaders:ctx.okLoaders,game_versions:[ctx.target],version_types:ctx.allowed}})||{};
+      for(const e of mrHash){const v=r[e.sha1];e.batch=v&&(v.game_versions||[]).includes(ctx.target)&&ctx.allowed.includes(v.version_type)?mrVer(v):null}
+    }catch(err){if(err.message===t("e_v2"))throw err}
+  }
+  await pool(base,4,async e=>{e.plan=await planOne(e,ctx);setProg(t("p_plan"),70+(++done/base.length)*20)});
+  if(SET.autoDeps){setProg(t("p_deps"),92);await resolveDeps(ctx)}
+  for(const e of S.entries){
+    const st=e.plan.st;
+    e.wrongLoader=!!(e.meta.loader&&!ctx.okLoaders.includes(e.meta.loader));
+    e.mcOk=st==="unknown"&&!e.wrongLoader?mcSat(e.meta,target):null;
+    if(st==="unknown")e.include=!e.wrongLoader&&!e.meta.bad&&!e.meta.none&&(mode==="update"?e.mcOk!==false:e.mcOk===true);
+    else e.include=["update","keep","current"].includes(st);
+    if(e.uid in S.userInc&&canInclude(e))e.include=S.userInc[e.uid];
+  }
+  await computeRecs(ctx);
+  S.popOffset=0;await loadPopular();
+  S.javaInfo=await javaFor(target);
+}
+async function loadPopular(){
+  const ctx=S.ctx;S.pop=[];if(!ctx)return;
+  const cc={};
+  for(const e of S.entries){if(!e.include||!e.project)continue;for(const c of e.project.cats||[])cc[c]=(cc[c]||0)+1}
+  const top=Object.keys(cc).sort((a,b)=>cc[b]-cc[a]).slice(0,4);
+  const facets=[["project_type:mod"],ctx.okLoaders.map(l=>"categories:"+l),["versions:"+ctx.target]];
+  if(top.length)facets.push(top.map(c=>"categories:"+c));
+  const slugs=new Set(S.entries.map(e=>norm(e.project&&e.project.slug)).filter(Boolean));
+  try{
+    for(let tries=0;tries<3&&S.pop.length<6;tries++){
+      const r=await mr("/search?limit=20&index=downloads&offset="+S.popOffset+"&facets="+enc(JSON.stringify(facets)));
+      S.popTotal=(r&&r.total_hits)||0;
+      for(const h of (r&&r.hits)||[]){
+        if(S.pop.length>=6)break;
+        if(isAdded(h.project_id)||S.dismiss.has(h.project_id)||slugs.has(norm(h.slug))||S.recs.some(x=>x.p.id===h.project_id))continue;
+        S.pop.push(S.mrProj[h.project_id]||(S.mrProj[h.project_id]=mrProjN(h)));
+      }
+      if(S.pop.length>=6||!S.popTotal)break;
+      S.popOffset+=20;if(S.popOffset>=S.popTotal)S.popOffset=0;
+    }
+  }catch(_){}
+}
+async function refreshRecs(){
+  if(!S.ctx||S.recBusy)return;
+  S.recBusy=true;$("btnRecRefresh").disabled=true;$("btnRecRefresh").textContent=t("recLoading");
+  S.popOffset+=20;if(S.popTotal&&S.popOffset>=S.popTotal)S.popOffset=0;
+  try{await computeRecs(S.ctx);await loadPopular()}catch(_){}
+  S.recBusy=false;renderRecs();
+}
+const canInclude=e=>["update","keep","current","unknown"].includes(e.plan.st);
+const numPart=v=>(String(v).match(/^\d+(?:\.\d+)*/)||["0"])[0];
+function verOp(op,want,v){
+  if(/[x*]/i.test(want)){const pre=want.split(/\.?[x*]/i)[0];return !pre||v===pre||v.startsWith(pre+".")}
+  const c=cmpVer(numPart(v),numPart(want)),a=numPart(want).split("."),b=numPart(v).split(".");
+  switch(op){case">=":return c>=0;case"<=":return c<=0;case">":return c>0;case"<":return c<0;
+    case"~":return c>=0&&a[0]===b[0]&&(a.length<2||a[1]===b[1]);
+    case"^":return c>=0&&a[0]===b[0];
+    default:return c===0}
+}
+function mcSat(meta,v){
+  const spec=meta.mcReq;if(spec==null||spec==="")return null;
+  try{
+    if(meta.mcMaven){
+      const s=String(spec).trim();if(s==="*"||s==="")return true;
+      return s.split(/(?<=[\])]),/).some(r=>{r=r.trim();
+        const m=/^([\[(])\s*([^,]*?)\s*(?:,\s*([^\])]*?)\s*)?([\])])$/.exec(r);
+        if(!m)return cmpVer(numPart(v),numPart(r))>=0;
+        if(m[3]===undefined)return cmpVer(numPart(v),numPart(m[2]))===0;
+        const lo=m[2],hi=m[3];
+        if(lo&&!(m[1]==="["?cmpVer(numPart(v),numPart(lo))>=0:cmpVer(numPart(v),numPart(lo))>0))return false;
+        if(hi&&!(m[4]==="]"?cmpVer(numPart(v),numPart(hi))<=0:cmpVer(numPart(v),numPart(hi))<0))return false;
+        return true});
+    }
+    const alts=(Array.isArray(spec)?spec:[spec]).flatMap(s=>String(s).split("||"));
+    return alts.some(a=>{const parts=a.trim().replace(/(>=|<=|>|<|=|~|\^)\s+/g,"$1").split(/\s+/).filter(Boolean);
+      if(!parts.length||parts.includes("*"))return true;
+      return parts.every(p=>{const m=/^(>=|<=|>|<|=|~|\^)?(.+)$/.exec(p);return verOp(m[1]||"=",m[2],v)})});
+  }catch(_){return null}
+}
+async function computeRecs(ctx){
+  S.recs=[];
+  const have=new Set(S.entries.filter(e=>e.src).map(e=>e.src+":"+e.pid)),slugs=new Set(S.entries.map(e=>norm(e.project&&e.project.slug)).filter(Boolean)),want=new Map();
+  for(const e of S.entries){if(!e.include||e.src!=="mr")continue;const v=e.plan.ver||e.cur;for(const id of (v&&v.opt)||[])if(!have.has("mr:"+id)&&!want.has(id))want.set(id,title(e))}
+  if(!want.size)return;
+  try{await mrLoadProjects([...want.keys()])}catch(_){return}
+  for(const [id,forName] of want){
+    const p=S.mrProj[id];
+    if(!p||slugs.has(norm(p.slug))||S.dismiss.has(id))continue;
+    if(p.loaders&&p.loaders.length&&!p.loaders.some(l=>ctx.okLoaders.includes(l)))continue;
+    if(p.gv&&p.gv.length&&!p.gv.includes(ctx.target))continue;
+    S.recs.push({p,forName});if(S.recs.length>=12)break;
+  }
+}
+const JAVA_FALLBACK=v=>{const p=String(v).split(/[.\-]/).map(Number);if(p[0]>=26)return 25;if(p[0]!==1)return null;const mi=p[1],pa=p[2]||0;if(mi<=16)return 8;if(mi===17)return 16;if(mi<20||(mi===20&&pa<=4))return 17;return 21};
+async function javaFor(v){
+  if(S.java[v])return S.java[v];
+  try{
+    if(!S.manifest)S.manifest=await (await fetch("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")).json();
+    const it=S.manifest.versions.find(x=>x.id===v);
+    if(it){const j=await (await fetch(it.url)).json();if(j.javaVersion)return S.java[v]={j:j.javaVersion.majorVersion,est:false}}
+  }catch(_){}
+  const f=JAVA_FALLBACK(v);return S.java[v]=f?{j:f,est:true}:null;
+}
+function orphans(){
+  const inc=S.entries.filter(e=>e.include),ids=new Set(),keys=new Set(),res=new Set();
+  for(const e of inc){const v=e.plan.ver||e.cur;for(const d of (v&&v.deps)||[]){if(d.project_id)ids.add("mr:"+d.project_id);if(d.cfModId)ids.add("cf:"+d.cfModId)}for(const k of e.meta.deps||[])keys.add(String(k).toLowerCase())}
+  const needed=e=>{const ids=[e.meta.modId].concat(e.meta.provides||[]).filter(Boolean).map(x=>String(x).toLowerCase());return ids.some(i=>keys.has(i))};
+  for(const e of S.entries){
+    if(!(e.project&&e.project.lib)||e.isDep||e.dup||!canInclude(e))continue;
+    if(ids.has(e.src+":"+e.pid))continue;
+    const id=(e.meta.modId||"").toLowerCase();
+    if(!id||needed(e))continue;
+    if(id==="fabric-api"&&[...keys].some(k=>k==="fabric"||(/^fabric-/.test(k)&&!/^fabric-(language-kotlin|loader)/.test(k))))continue;
+    res.add(e.uid);
+  }
+  return res;
+}
+function minVer(spec){if(!spec||spec==="*")return null;const r=/(\d+(?:\.\d+)+)/.exec(String(spec));return r?r[1]:null}
+function cmpVer(a,b){const x=a.split(".").map(Number),y=b.split(".").map(Number);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0}
+async function loaderReq(out){
+  const L=S.ctx.loader;let best=null;
+  for(const o of out){
+    let m=o.e.meta||{};
+    if(!o.kept){try{m=await readMeta(o.buf)}catch(_){m={}}}
+    if(m.loader!==L)continue;
+    const v=minVer(m.loaderReq);if(v&&(!best||cmpVer(v,best)>0))best=v;
+  }
+  return best;
+}
+const LOADER_PAGE={fabric:["Fabric Loader","https://fabricmc.net/use/installer/"],quilt:["Quilt Loader","https://quiltmc.org/en/install/"],neoforge:["NeoForge","https://neoforged.net/"],forge:["Forge","https://files.minecraftforge.net/"]};
+async function resolveDeps(ctx){
+  const have=new Set(),slugs=new Set();
+  for(const e of S.entries)if(e.src){have.add(e.src+":"+e.pid);if(e.project&&e.project.slug)slugs.add(norm(e.project.slug))}
+  const queue=[];
+  const push=e=>{const v=e.plan&&e.plan.ver;if(v&&["update","keep","current","manual"].includes(e.plan.st))for(const d of v.deps||[])queue.push({d,from:e,src:e.src})};
+  S.entries.forEach(push);
+  let guard=0;
+  while(queue.length&&guard++<300){
+    const {d,from,src}=queue.shift();
+    let pid=src==="mr"?d.project_id:d.cfModId;
+    try{
+      if(src==="mr"&&!pid&&d.version_id){const v=await mr("/version/"+d.version_id);pid=v&&v.project_id}
+      if(!pid||have.has(src+":"+pid))continue;
+      have.add(src+":"+pid);
+      if(src==="mr")await mrLoadProjects([pid]);else await cfLoadMods([pid]);
+      const project=src==="mr"?S.mrProj[pid]:S.cfProj[pid];
+      if(!project||slugs.has(norm(project.slug)))continue;
+      if(project.loaders&&project.loaders.length&&!project.loaders.some(l=>ctx.okLoaders.includes(l)))continue;
+      if(project.latest&&project.latest.length){const ids=ctx.okLoaders.map(l=>CF_LOADER[l]);if(!project.latest.some(x=>ids.includes(x.modLoader)))continue}
+      slugs.add(norm(project.slug));
+      const de={uid:"d_"+src+"_"+pid,isDep:true,depOf:(from.project&&from.project.title)||from.fileName,src,pid,project,meta:{}};
+      de.plan=await planOne(de,ctx);
+      S.entries.push(de);push(de);
+    }catch(err){if(src==="cf")cfErr(err)}
+  }
+}
+
+/* ---------- download & output ---------- */
+function cfDlUrl(url){const p=SET.cfProxy.trim().replace(/\/+$/,"");if(p)return p+"/dl?u="+enc(url);if(SET.cfKey)return url+(url.includes("?")?"&":"?")+"api-key="+enc(SET.cfKey.trim());return url}
+function manualLink(e){const v=e.plan.ver;if(e.src==="cf")return v&&v.id&&e.project.url?e.project.url.replace(/\/$/,"")+"/files/"+v.id:e.project.url;return (v&&v.file&&v.file.url)||e.project.url}
+async function fetchFile(e){
+  const f=e.plan.ver.file;
+  const r=await fetch(e.src==="cf"?cfDlUrl(f.url):f.url);
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const buf=await r.arrayBuffer();
+  if(f.sha1&&(await sha1hex(buf))!==f.sha1.toLowerCase())throw new Error(t("hashBad"));
+  return{name:f.name,buf};
+}
+async function collect(){
+  const sel=S.entries.filter(e=>e.include);
+  if(!sel.length)throw new Error(t("e_noSel"));
+  const out=[],manual=S.entries.filter(e=>e.plan.st==="manual").map(e=>({e,reason:t("n_manual")}));
+  let done=0;
+  await pool(sel,3,async e=>{
+    try{
+      if(["keep","current","unknown"].includes(e.plan.st)&&e.file)out.push({e,kept:true,name:e.fileName.replace(/\s*\(\d+\)(?=\.jar$)/i,""),buf:await e.file.arrayBuffer()});
+      else out.push(Object.assign({e},await fetchFile(e)));
+    }catch(err){manual.push({e,reason:t("dlFailed",{r:err.message==="Failed to fetch"?"CORS":err.message})})}
+    ++done;setProg(t("p_dl")+" "+done+"/"+sel.length,done/sel.length*90);
+  });
+  S.lastManual=manual;
+  return{out,manual};
+}
+function cfSearch(e){const q=e.meta.name||e.meta.modId||e.fileName.replace(/\.jar$/i,"").replace(/[-_+]?(mc)?\d[\w.+-]*$/i,"");return "https://www.curseforge.com/minecraft/search?class=mc-mods&search="+enc(q)}
+function title(e){return (e.project&&e.project.title)||e.meta.name||e.fileName}
+function report(out,manual,req){
+  const c=S.ctx,L=[];
+  L.push(t("r_title"),"=".repeat(30),t("r_date")+": "+new Date().toLocaleString(),t("r_mode")+": "+t("m_"+c.mode),t("r_target")+": "+c.target+" · "+LNAME[c.loader]);
+  if(S.javaInfo)L.push(t("r_java")+": Java "+S.javaInfo.j+(S.javaInfo.est?t("f_javaEst"):""));
+  if(req)L.push(t("r_loader")+": "+LOADER_PAGE[c.loader][0]+" "+req+"+  "+LOADER_PAGE[c.loader][1]);
+  if(S.configs.length)L.push(t("r_cfg")+": "+S.configs.length);
+  L.push("");
+  L.push(t("r_files")+" ("+out.length+"):");
+  for(const o of out){const e=o.e,ol=e.cur?e.cur.number:"",nw=e.plan.ver?e.plan.ver.number:ol;L.push("  ["+t("r_st_"+stKey(e))+"] "+title(e)+(ol&&ol!==nw?"  "+ol+" -> "+nw:nw?"  "+nw:"")+"  ("+(e.src==="cf"?"CurseForge":e.src==="mr"?"Modrinth":"-")+")  "+o.name)}
+  if(manual.length){L.push("",t("r_manual")+":");for(const m of manual)L.push("  - "+title(m.e)+": "+manualLink(m.e)+"  ("+m.reason+")")}
+  const miss=S.entries.filter(e=>e.plan.st==="missing");
+  if(miss.length){L.push("",t("r_missing")+":");for(const e of miss)L.push("  - "+title(e)+(e.isDep?" ("+t("n_depOf",{m:e.depOf})+")":"")+"  "+(e.plan.note||""))}
+  const unk=S.entries.filter(e=>e.plan.st==="unknown"&&!e.include);
+  if(unk.length){L.push("",t("r_unknown")+":");for(const e of unk)L.push("  - "+e.fileName+"  "+cfSearch(e))}
+  const orph=orphans();
+  if(orph.size){L.push("",t("r_orphan")+":");for(const e of S.entries)if(orph.has(e.uid))L.push("  - "+title(e))}
+  return L.join("\r\n");
+}
+function folderName(){return "modshift_"+S.ctx.target+"_"+S.ctx.loader}
+async function doZip(){
+  if(S.busy)return;setBusy(true);clearOut();
+  try{
+    const {out,manual}=await collect();
+    const req=await loaderReq(out);
+    setProg(t("p_zip"),95);
+    const zip=new JSZip(),dir=zip.folder("mods");
+    for(const o of out)dir.file(o.name,o.buf);
+    for(const c of S.configs)zip.file(c.path,c.file);
+    zip.file(SET.lang==="tr"?"rapor.txt":"report.txt",report(out,manual,req));
+    const blob=await zip.generateAsync({type:"blob"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=folderName()+".zip";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+    finish(out,manual,null,req);
+  }catch(err){addOut(err.message,"bad")}
+  setBusy(false);
+}
+async function doFolder(){
+  if(S.busy)return;
+  if(!window.showDirectoryPicker){addOut(t("e_noFolder"),"bad");return}
+  let root;try{root=await window.showDirectoryPicker({mode:"readwrite"})}catch(_){return}
+  setBusy(true);clearOut();
+  try{
+    const {out,manual}=await collect();
+    const req=await loaderReq(out);
+    const name=folderName();const base=await root.getDirectoryHandle(name,{create:true});
+    const write=async(path,data)=>{const parts=path.split("/");let d=base;for(const p of parts.slice(0,-1))d=await d.getDirectoryHandle(p,{create:true});const fh=await d.getFileHandle(parts[parts.length-1],{create:true});const w=await fh.createWritable();await w.write(data);await w.close()};
+    const pre=S.configs.length?"mods/":"";
+    for(const o of out)await write(pre+o.name,o.buf);
+    for(const c of S.configs)await write(c.path,c.file);
+    await write(SET.lang==="tr"?"rapor.txt":"report.txt",report(out,manual,req));
+    finish(out,manual,root.name+"/"+name,req);
+  }catch(err){addOut(err.message,"bad")}
+  setBusy(false);
+}
+function finish(out,manual,folder,req){
+  setProg("",100);$("prog").hidden=true;
+  addOut((folder?t("saved",{f:folder,n:out.length}):t("done",{n:out.length}))+(manual.length?" "+t("doneManual",{m:manual.length}):""),manual.length?"warn":"ok");
+  if(req){const lp=LOADER_PAGE[S.ctx.loader],d=document.createElement("div");d.className="msg";d.innerHTML=esc(t("loaderNeed",{l:lp[0],v:req}))+' <a href="'+esc(lp[1])+'" target="_blank" rel="noopener">'+esc(t("loaderLink"))+"</a>"+(S.javaInfo?" · "+t("f_java",{j:S.javaInfo.j})+(S.javaInfo.est?esc(t("f_javaEst")):""):"");$("outMsgs").appendChild(d)}
+  if(manual.length){
+    const box=document.createElement("div");box.className="msg warn";
+    box.innerHTML="<b>"+esc(t("manualList"))+"</b><br>"+manual.map(m=>'<a href="'+esc(manualLink(m.e))+'" target="_blank" rel="noopener">'+esc(title(m.e))+"</a> <span class=\"info\">("+esc(m.reason)+")</span>").join("<br>");
+    $("outMsgs").appendChild(box);
+  }
+}
+
+/* ---------- UI ---------- */
+function setProg(txt,p){$("prog").hidden=false;if(txt)$("progTxt").textContent=txt;$("progBar").style.width=Math.min(100,p)+"%"}
+function addMsg(txt,kind){if([...$("msgs").children].some(c=>c.textContent===txt))return;const d=document.createElement("div");d.className="msg "+(kind||"");d.textContent=txt;$("msgs").appendChild(d)}
+function addOut(txt,kind){const d=document.createElement("div");d.className="msg "+(kind||"");d.textContent=txt;$("outMsgs").appendChild(d)}
+function clearOut(){$("outMsgs").innerHTML=""}
+function setBusy(b){S.busy=b;["btnAnalyze","btnCompat","btnZip","btnFolder","btnClear"].forEach(id=>$(id).disabled=b)}
+function setStale(){if(S.entries.length&&S.ctx){S.stale=true;$("stale").hidden=false}}
+function renderFiles(){
+  const n=S.files.length;$("filesBox").hidden=!n;if(!n)return;
+  $("filesCount").textContent=t("nFiles",{n})+(S.configs.length?"  "+t("cfgKeep",{n:S.configs.length}):"");
+  $("filesList").textContent=S.files.map(f=>f.name).join("  ·  ");
+}
+const relPath=f=>String(f._path||f.webkitRelativePath||f.name).replace(/^\/+/,"");
+const MODS_RE=/(^|\/)mods\/[^/]+\.jar$/i;
+function addFiles(list){
+  const hasMods=list.some(f=>MODS_RE.test(relPath(f)));
+  const key=f=>f.name+"|"+f.size;const have=new Set(S.files.map(key));
+  const cfg=new Set(S.configs.map(c=>c.path));
+  for(const f of list){
+    const p=relPath(f);
+    if(/\.jar$/i.test(f.name)){if(hasMods&&!MODS_RE.test(p))continue;if(p.split("/").slice(0,-1).some(d=>SKIP_DIRS.has(d.toLowerCase())))continue;if(!have.has(key(f))){S.files.push(f);have.add(key(f))}continue}
+    if(!hasMods)continue;
+    const m=p.match(/^(?:[^/]+\/)?(config\/.+|options\.txt)$/);
+    if(m&&!cfg.has(m[1])){S.configs.push({path:m[1],file:f});cfg.add(m[1])}
+  }
+  S.identified=false;S.entries=[];S.ctx=null;S.userInc={};$("s3").hidden=true;$("compat").hidden=true;$("msgs").innerHTML="";renderFiles();
+}
+const SKIP_DIRS=new Set(["saves","versions","libraries","assets","logs","crash-reports","screenshots","resourcepacks","shaderpacks","cache",".fabric","xaero","downloads","schematics","backups"]);
+async function filesFromDrop(dt){
+  const entries=[...(dt.items||[])].map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+  if(!entries.length)return [...dt.files];
+  const out=[];
+  const walk=async en=>{
+    if(en.isFile)await new Promise(r=>en.file(f=>{try{f._path=en.fullPath}catch(_){}out.push(f);r()},()=>r()));
+    else if(en.isDirectory&&!SKIP_DIRS.has(en.name.toLowerCase())){const rd=en.createReader();let b;do{b=await new Promise(r=>rd.readEntries(r,()=>r([])));for(const c of b)await walk(c)}while(b.length)}
+  };
+  for(const en of entries)await walk(en);
+  return out;
+}
+const ORDER=["update","add","dep","keep","current","jarok","manual","missing","unknown","dup"];
+function stKey(e){const ok=["update","keep","current"].includes(e.plan.st);return e.added&&ok?"add":e.isDep&&ok?"dep":e.plan.st==="unknown"&&e.mcOk===true?"jarok":e.plan.st}
+const fmtSize=b=>b>=1048576?(b/1048576).toFixed(1)+" MB":Math.max(1,Math.round(b/1024))+" KB";
+function renderFacts(){
+  let before=0,after=0,dl=0,dlN=0;
+  for(const f of S.files)before+=f.size;
+  for(const e of S.entries){if(!e.include)continue;if(["keep","current","unknown"].includes(e.plan.st)&&e.file)after+=e.file.size;else{const s=(e.plan.ver&&e.plan.ver.file&&e.plan.ver.file.size)||0;after+=s;dl+=s;dlN++}}
+  const f=["<span>"+t("f_dl",{n:dlN,s:fmtSize(dl)})+"</span>","<span>"+t("f_total",{a:fmtSize(before),b:fmtSize(after)})+"</span>"];
+  if(S.javaInfo)f.push("<span>"+t("f_java",{j:S.javaInfo.j})+(S.javaInfo.est?esc(t("f_javaEst")):"")+"</span>");
+  $("facts").innerHTML=f.join("");
+}
+const fmtNum=n=>n>=999500?(n/1e6).toFixed(1).replace(/\.0$/,"")+"M":n>=1e3?Math.round(n/1e3)+"K":String(n||0);
+function recItem(p,sub){return '<div class="it it3">'+(p.icon?'<img src="'+esc(p.icon)+'" alt="" loading="lazy">':'<span class="ph"></span>')+'<div style="min-width:0"><a href="'+esc(p.url)+'" target="_blank" rel="noopener"><b>'+esc(p.title)+'</b></a><div class="d">'+esc(sub)+'</div></div><button type="button" class="sm" data-add="'+esc(p.id)+'">'+esc(t("addBtn"))+'</button><button type="button" class="x" data-dis="'+esc(p.id)+'" title="'+esc(t("recHide"))+'" aria-label="'+esc(t("recHide"))+'">×</button></div>'}
+function renderRecs(){
+  if(!S.ctx){$("recs").hidden=true;return}
+  const r=S.recs||[],pop=S.pop||[];
+  $("recs").hidden=false;
+  let h='<div class="recs-h"><h3>'+esc(t("recsTitle"))+'</h3><button type="button" class="sm" id="btnRecRefresh"'+(S.recBusy?" disabled":"")+">"+esc(t(S.recBusy?"recLoading":"recRefresh"))+"</button></div>";
+  if(r.length)h+='<p class="info">'+esc(t("recOptTitle"))+'</p><div class="sres">'+r.map(x=>recItem(x.p,t("recFor",{m:x.forName}))).join("")+"</div>";
+  if(pop.length)h+='<p class="info">'+esc(t("recPopTitle",{v:S.ctx.target,l:LNAME[S.ctx.loader]}))+'</p><div class="sres">'+pop.map(p=>recItem(p,"⬇ "+fmtNum(p.downloads)+" · "+p.desc)).join("")+"</div>";
+  if(!r.length&&!pop.length)h+='<p class="info">'+esc(t("recNone"))+"</p>";
+  $("recs").innerHTML=h;
+}
+const isAdded=id=>S.added.some(e=>e.pid===id)||S.entries.some(e=>e.src==="mr"&&e.pid===id);
+function renderAdded(){
+  $("addedBox").hidden=!S.added.length;
+  $("addedBox").innerHTML=S.added.map(e=>'<span class="chip">'+esc(title(e))+'<button type="button" data-rm="'+esc(e.pid)+'" aria-label="×">×</button></span>').join("");
+}
+async function addProject(p){
+  if(isAdded(p.id))return;
+  const e={uid:"a_"+p.id,added:true,src:"mr",pid:p.id,project:p,meta:{},fileName:p.title};
+  S.added.push(e);renderAdded();
+  if(!S.identified)return;
+  S.entries.push(e);
+  if(!S.ctx)return;
+  try{e.plan=await planOne(e,S.ctx)}catch(_){e.plan={st:"missing"}}
+  e.include=e.plan.st==="update";
+  if(SET.autoDeps&&e.include){try{await resolveDeps(S.ctx)}catch(_){}for(const x of S.entries)if(x.include===undefined)x.include=["update","keep","current"].includes(x.plan.st)}
+  S.recs=(S.recs||[]).filter(r=>r.p.id!==p.id);
+  renderResults();
+}
+function removeAdded(pid){
+  S.added=S.added.filter(e=>e.pid!==pid);
+  S.entries=S.entries.filter(e=>!(e.added&&e.pid===pid));
+  renderAdded();if(S.ctx)renderResults();
+}
+async function searchMods(){
+  const q=$("addQ").value.trim();if(!q)return;
+  const l=$("selLoader").value==="auto"?(S.pack.loader||null):$("selLoader").value;
+  const facets=[["project_type:mod"]];if(l)facets.push(["categories:"+l]);
+  const box=$("sres");box.hidden=false;box.innerHTML='<div class="it"><span></span><span class="info">…</span></div>';
+  try{
+    const r=await mr("/search?limit=8&index=relevance&query="+enc(q)+"&facets="+enc(JSON.stringify(facets)));
+    const hits=S.hits=(r&&r.hits)||[];
+    box.innerHTML=hits.length?hits.map((h,i)=>'<div class="it">'+(h.icon_url?'<img src="'+esc(h.icon_url)+'" alt="" loading="lazy">':'<span class="ph"></span>')+'<div style="min-width:0"><b>'+esc(h.title)+'</b><div class="d">'+esc(h.description||"")+'</div></div><button type="button" class="sm" data-hit="'+i+'"'+(isAdded(h.project_id)?" disabled":"")+">"+esc(t(isAdded(h.project_id)?"added":"addBtn"))+"</button></div>").join(""):'<div class="it"><span></span><span class="info">'+esc(t("noRes"))+"</span></div>";
+  }catch(err){box.innerHTML='<div class="it"><span></span><span class="info">'+esc(err.message)+"</span></div>"}
+}
+function renderResults(){
+  const c=S.ctx;if(!c)return;
+  $("s3").hidden=false;$("stale").hidden=!S.stale;
+  $("detected").textContent=t("detected",{v:S.pack.version||t("unknownVer"),l:LNAME[S.pack.loader]||"?",tv:c.target,tl:LNAME[c.loader]});
+  const cnt={};for(const e of S.entries){const k=stKey(e);cnt[k]=(cnt[k]||0)+1}
+  const orph=orphans();if(orph.size)cnt.orphan=orph.size;
+  if(S.filter&&!cnt[S.filter])S.filter=null;
+  $("sum").innerHTML=ORDER.concat("orphan").filter(k=>cnt[k]).map(k=>'<button type="button" class="pill p-'+k+'" data-f="'+k+'" aria-pressed="'+(S.filter===k)+'">'+esc(t("st_"+k))+" · "+cnt[k]+"</button>").join("");
+  renderFacts();renderRecs();
+  const incl=S.entries.filter(e=>e.include&&e.src),byKey={},pairs=[],cmap={};
+  incl.forEach(e=>byKey[e.src+":"+e.pid]=e);
+  for(const e of incl){const v=e.plan.ver||e.cur;for(const id of (v&&v.inc)||[]){const o=byKey[e.src+":"+id];if(!o||o===e)continue;const k=[e.uid,o.uid].sort().join("|");if(!pairs.some(p=>p.k===k))pairs.push({k,a:e,b:o});(cmap[e.uid]=cmap[e.uid]||new Set()).add(title(o));(cmap[o.uid]=cmap[o.uid]||new Set()).add(title(e))}}
+  $("conf").hidden=!pairs.length;
+  $("conf").innerHTML=pairs.length?"<b>"+esc(t("conflictTitle"))+"</b><br>"+pairs.map(p=>esc(title(p.a))+" ↔ "+esc(title(p.b))).join("<br>"):"";
+  const fq=$("fq").value.trim().toLowerCase();
+  const rows=[...S.entries].filter(e=>(!S.filter||(S.filter==="orphan"?orph.has(e.uid):stKey(e)===S.filter))&&(!fq||(title(e)+" "+(e.fileName||"")).toLowerCase().includes(fq))).sort((a,b)=>ORDER.indexOf(stKey(a))-ORDER.indexOf(stKey(b))||title(a).localeCompare(title(b)));
+  S.visible=rows.map(e=>e.uid);
+  $("mods").innerHTML=rows.map(e=>{
+    const k=stKey(e),p=e.project||{};
+    const can=["update","keep","current","unknown"].includes(e.plan.st);
+    const ol=e.cur?e.cur.number:(e.meta.version||"");
+    const nw=e.plan.ver?e.plan.ver.number:"";
+    let vr="";
+    if(ol&&nw&&ol!==nw)vr=esc(ol)+" → <b>"+esc(nw)+"</b>";else if(nw)vr="<b>"+esc(nw)+"</b>";else if(ol)vr=esc(ol);
+    const notes=[];
+    if(e.match==="name")notes.push(t("n_name"));
+    if(e.isDep)notes.push(t("n_depOf",{m:e.depOf}));
+    if(e.plan.note)notes.push(e.plan.note);
+    if(e.added)notes.push(t("n_added"));
+    if(e.plan.st==="unknown")notes.push(e.fileName+(e.meta.bad||e.meta.none||e.wrongLoader?"":" · "+t("n_unknown")));
+    if(e.meta.bad)notes.push(t("badJar"));else if(e.meta.none&&!e.src)notes.push(t("notMod"));else if(e.wrongLoader)notes.push(e.plan.st==="update"?t("wrongFixed"):t("wrongLoader",{l:LNAME[e.meta.loader]}));
+    if(e.mcOk===true)notes.push(t("n_mcOk",{v:c.target}));else if(e.mcOk===false)notes.push(t("n_mcNo",{v:c.target,s:[].concat(e.meta.mcReq).join(" | ")}));
+    if(orph.has(e.uid))notes.push(t("orphan"));
+    const src=e.src==="cf"?"CurseForge":e.src==="mr"?"Modrinth":"";
+    const icon=p.icon?'<img class="ic" src="'+esc(p.icon)+'" alt="" loading="lazy" onerror="this.removeAttribute(\'src\')">':'<span class="ic"></span>';
+    return '<div class="mod'+(e.include?"":" off")+'">'+
+      '<input type="checkbox" class="chk" id="inc-'+esc(e.uid)+'" data-uid="'+esc(e.uid)+'"'+(e.include?" checked":"")+(can?"":" disabled")+' aria-label="'+esc(title(e))+'">'+
+      icon+'<div style="min-width:0"><div class="nm">'+esc(title(e))+(src?' <span class="src">'+src+"</span>":"")+(orph.has(e.uid)?' <span class="badge">'+esc(t("st_orphan"))+"</span>":"")+"</div>"+
+      (vr?'<div class="vr">'+vr+"</div>":"")+(notes.length?'<div class="nt">'+esc(notes.join(" · "))+"</div>":"")+
+      (cmap[e.uid]?'<div class="cf">'+esc(t("conflictWith",{m:[...cmap[e.uid]].join(", ")}))+"</div>":"")+
+      (["update","manual"].includes(e.plan.st)&&e.plan.ver?'<button type="button" class="lnk" data-cl="'+esc(e.uid)+'">'+esc(t("changes"))+"</button>":"")+"</div>"+
+      '<span class="pill p-'+k+'">'+esc(t("st_"+k))+"</span>"+
+      (p.url?'<a class="go" href="'+esc(e.plan.st==="manual"?manualLink(e):p.url)+'" target="_blank" rel="noopener" aria-label="'+esc(title(e))+'">↗</a>':e.plan.st==="unknown"?'<a class="go" href="'+esc(cfSearch(e))+'" target="_blank" rel="noopener" title="CurseForge">↗</a>':"<span></span>")+
+      "</div>";
+  }).join("");
+}
+function setVisible(on){
+  const vis=new Set(S.visible||[]);
+  for(const e of S.entries)if(vis.has(e.uid)&&canInclude(e)){e.include=on;S.userInc[e.uid]=on}
+  renderResults();
+}
+async function analyze(){
+  if(S.busy)return;
+  if(!S.files.length&&!S.added.length){addMsg(t("e_noFiles"),"bad");return}
+  setBusy(true);$("msgs").innerHTML="";clearOut();
+  try{
+    if(!S.identified)await identify();
+    await plan();
+    S.stale=false;setProg("",100);$("prog").hidden=true;renderResults();
+    $("s3").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
+  }catch(err){$("prog").hidden=true;addMsg(err.message==="Failed to fetch"?t("e_net",{m:"Modrinth"}):err.message,"bad")}
+  setBusy(false);
+}
+function syncMode(){
+  const m=document.querySelector("input[name=mode]:checked").value;
+  $("verWrap").hidden=m==="update";$("updInfo").hidden=m!=="update";
+}
+function fillVersions(){
+  const snap=$("chkSnap").checked,sel=$("selVer"),prev=sel.value||(SET.ui&&SET.ui.ver);
+  if(!S.tags.length){if(SET.ui&&SET.ui.ver&&!$("txtVer").value)$("txtVer").value=SET.ui.ver;return}
+  const list=S.tags.filter(x=>snap||x.version_type==="release");
+  sel.innerHTML=list.map(x=>'<option value="'+esc(x.version)+'">'+esc(x.version)+(x.version_type!=="release"?" ("+esc(x.version_type)+")":"")+(x.version===S.pack.version?" ("+esc(t("curTag"))+")":"")+"</option>").join("");
+  if(prev&&list.some(x=>x.version===prev))sel.value=prev;
+}
+async function loadTags(){
+  try{const r=await mr("/tag/game_version");S.tags=r||[];S.tags.forEach((x,i)=>S.tagIdx[x.version]=i);fillVersions()}
+  catch(_){ $("selVer").hidden=true;$("txtVer").hidden=false;addMsg(t("e_tags"),"warn")}
+}
+
+/* ---------- version support matrix ---------- */
+async function supportFor(e,loader){
+  const ok=loader==="quilt"?["quilt","fabric"]:[loader],allowed=channels();
+  const key="sup:"+e.src+":"+e.pid+":"+loader+":"+SET.channel;
+  if(S.vcache[key])return S.vcache[key];
+  const gv=new Set();
+  if(e.src==="mr"){const r=await mr("/project/"+e.pid+"/version?include_changelog=false&loaders="+enc(JSON.stringify(ok)))||[];for(const v of r)if(allowed.includes(v.version_type))(v.game_versions||[]).forEach(x=>gv.add(x))}
+  else{const ids=ok.map(l=>CF_LOADER[l]),types={1:"release",2:"beta",3:"alpha"};for(const x of (e.project&&e.project.latest)||[])if(ids.includes(x.modLoader)&&allowed.includes(types[x.releaseType]||"release"))gv.add(x.gameVersion)}
+  return S.vcache[key]=gv;
+}
+async function compat(){
+  if(S.busy)return;
+  if(!S.files.length&&!S.added.length){addMsg(t("e_noFiles"),"bad");return}
+  setBusy(true);$("msgs").innerHTML="";
+  try{
+    if(!S.identified)await identify();
+    const loader=$("selLoader").value==="auto"?S.pack.loader:$("selLoader").value;
+    const mods=S.entries.filter(e=>!e.isDep&&!e.dup),known=mods.filter(e=>e.src),sups=new Map();
+    let done=0;
+    await pool(known,4,async e=>{try{sups.set(e,await supportFor(e,loader))}catch(_){sups.set(e,new Set())}setProg(t("p_compat"),(++done/Math.max(1,known.length))*100)});
+    const snap=$("chkSnap").checked;
+    let vers=S.tags.filter(x=>snap||x.version_type==="release").map(x=>x.version);
+    if(!vers.length){const u=new Set();sups.forEach(s=>s.forEach(v=>u.add(v)));vers=[...u].sort().reverse()}
+    const packI=S.pack.version?vers.indexOf(S.pack.version):-1;
+    vers=vers.slice(0,Math.min(24,Math.max(12,packI+4)));
+    const tot=mods.length;
+    $("compat").innerHTML="<h3>"+esc(t("compatTitle",{l:LNAME[loader],n:tot}))+"</h3>"+vers.map(v=>{
+      const miss=mods.filter(e=>e.src?!(sups.get(e)&&sups.get(e).has(v)):!(e.meta.loader===loader&&mcSat(e.meta,v)===true)),n=tot-miss.length,p=tot?n/tot:0,cls=p>=1?"full":p>=.8?"most":"few";
+      return '<details><summary><span class="v">'+esc(v)+(v===S.pack.version?" ●":"")+'</span><span class="b"><i class="'+cls+'" style="width:'+(p*100).toFixed(1)+'%"></i></span><span class="c">'+n+"/"+tot+'</span><button type="button" class="sm" data-v="'+esc(v)+'">'+esc(t("compatPick"))+'</button></summary><div class="miss">'+esc(miss.length?t("compatMiss",{m:miss.map(title).join(", ")}):t("compatAll"))+"</div></details>";
+    }).join("");
+    $("compat").hidden=false;
+  }catch(err){addMsg(err.message==="Failed to fetch"?t("e_net",{m:"Modrinth"}):err.message,"bad")}
+  $("prog").hidden=true;setBusy(false);
+}
+function pickVersion(v){
+  if($("m-update").checked)$("m-both").checked=true;
+  if(!$("txtVer").hidden)$("txtVer").value=v;
+  else{if(![...$("selVer").options].some(o=>o.value===v)){$("chkSnap").checked=true;fillVersions()}$("selVer").value=v}
+  syncMode();setStale();$("btnAnalyze").focus();
+}
+
+/* ---------- changelog + translate ---------- */
+let CL=null;
+function htmlToText(h){const s=String(h).replace(/<(br|\/p|\/li|\/h\d|\/div|\/ul)[^>]*>/gi,"\n").replace(/<li[^>]*>/gi,"- ").replace(/<h\d[^>]*>/gi,"## ");return (new DOMParser().parseFromString(s,"text/html").body.textContent||"").replace(/\n{3,}/g,"\n\n").trim()}
+function md(s){let h=esc(s);h=h.replace(/^#{1,6}\s*(.*)$/gm,"<h5>$1</h5>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`\n]+)`/g,"<code>$1</code>").replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/^\s*[-*+]\s+/gm,"• ");return h.replace(/\n/g,"<br>")}
+function renderCl(){
+  const items=CL.showTr&&CL.tr?CL.tr:CL.items;
+  $("clInfo").textContent=items.length>1?t("clCount",{n:items.length}):"";
+  $("clBody").innerHTML=items.map(i=>"<h4>"+esc(i.h)+"</h4><div>"+(i.text?md(i.text):'<span class="info">'+esc(t("clNone"))+"</span>")+"</div>").join("");
+}
+async function openChangelog(uid){
+  const e=S.entries.find(x=>x.uid===uid);if(!e||!e.plan.ver)return;
+  CL={items:[],tr:null,showTr:false};
+  $("clTitle").textContent=title(e);$("clBody").innerHTML='<p class="info">'+esc(t("clLoading"))+"</p>";$("clInfo").textContent="";
+  $("clTr").textContent=t("translate");$("clTr").disabled=true;
+  $("clDlg").showModal();
+  try{
+    const target=e.plan.ver,cur=e.cur;
+    let list=[];try{list=await versionsFor(e.src,e.pid,S.ctx)}catch(_){}
+    let sel=list.filter(v=>new Date(v.date)<=new Date(target.date)&&(!cur||new Date(v.date)>new Date(cur.date)));
+    if(!sel.some(v=>v.id===target.id))sel.unshift(target);
+    sel=sel.slice(0,10);
+    if(e.src==="mr"){
+      const r=await mr("/versions?ids="+enc(JSON.stringify(sel.map(v=>v.id))))||[];
+      r.sort((a,b)=>new Date(b.date_published)-new Date(a.date_published));
+      CL.items=r.map(v=>({h:v.version_number,text:(v.changelog||"").trim()}));
+    }else{
+      for(const v of sel.slice(0,5)){const r=await cf("/mods/"+e.pid+"/files/"+v.id+"/changelog");CL.items.push({h:v.number,text:htmlToText((r&&r.data)||"")})}
+    }
+    renderCl();
+    $("clTr").disabled=!CL.items.some(i=>i.text);
+  }catch(err){$("clBody").innerHTML='<p class="msg bad">'+esc(t("e_net",{m:err.message}))+"</p>"}
+}
+async function gtx(text,tl){
+  const parts=[];let cur="";
+  for(const line of text.split("\n")){if(cur&&cur.length+line.length>1400){parts.push(cur);cur=""}cur+=line+"\n"}
+  if(cur)parts.push(cur);
+  let out="";
+  for(const p of parts){const r=await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl="+tl+"&dt=t&q="+enc(p));if(!r.ok)throw new Error(r.status);const j=await r.json();out+=(j[0]||[]).map(x=>x[0]).join("")}
+  return out.trim();
+}
+async function toggleTranslate(){
+  if(!CL)return;
+  if(CL.tr){CL.showTr=!CL.showTr;$("clTr").textContent=t(CL.showTr?"showOrig":"translate");renderCl();return}
+  const tl=SET.lang==="tr"?"tr":"en";
+  $("clTr").disabled=true;$("clInfo").textContent=t("trWorking");
+  try{
+    const tr=[];for(const i of CL.items)tr.push({h:i.h,text:i.text?await gtx(i.text,tl):""});
+    CL.tr=tr;CL.showTr=true;$("clTr").textContent=t("showOrig");renderCl();
+  }catch(_){
+    const all=CL.items.map(i=>i.h+"\n"+i.text).join("\n\n").slice(0,4500);
+    $("clInfo").innerHTML=esc(t("trFail"))+' <a href="https://translate.google.com/?sl=auto&amp;tl='+tl+"&amp;op=translate&amp;text="+enc(all)+'" target="_blank" rel="noopener">'+esc(t("openGT"))+"</a>";
+  }
+  $("clTr").disabled=false;
+}
+
+const WORKER=`// ModShift - CurseForge proxy (Cloudflare Worker)
+// Secret: CF_KEY = your CurseForge API key
+export default {
+  async fetch(req, env) {
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "content-type, accept",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+    };
+    if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+    const u = new URL(req.url);
+    let target;
+    if (u.pathname === "/dl") {
+      target = u.searchParams.get("u") || "";
+      if (!/^https:\\/\\/(edge|mediafilez)\\.forgecdn\\.net\\//.test(target))
+        return new Response("bad url", { status: 400, headers: cors });
+    } else if (u.pathname.startsWith("/v1/")) {
+      target = "https://api.curseforge.com" + u.pathname + u.search;
+    } else {
+      return new Response("not found", { status: 404, headers: cors });
+    }
+    const r = await fetch(target, {
+      method: req.method,
+      headers: { "x-api-key": env.CF_KEY, "content-type": "application/json", "accept": "application/json" },
+      body: req.method === "POST" ? await req.text() : undefined
+    });
+    const h = new Headers(r.headers);
+    for (const k in cors) h.set(k, cors[k]);
+    return new Response(r.body, { status: r.status, headers: h });
+  }
+};`;
+
+/* ---------- wire up ---------- */
+$("workerCode").textContent=WORKER;
+$("btnFiles").onclick=()=>$("inFiles").click();
+$("btnDir").onclick=()=>$("inDir").click();
+$("inFiles").onchange=e=>{addFiles([...e.target.files]);e.target.value=""};
+$("inDir").onchange=e=>{addFiles([...e.target.files]);e.target.value=""};
+$("btnClear").onclick=()=>{S.files=[];S.configs=[];addFiles([])};
+const drop=$("drop");
+drop.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("inFiles").click()}});
+const isFileDrag=e=>e.dataTransfer&&[...(e.dataTransfer.types||[])].includes("Files");
+["dragenter","dragover"].forEach(ev=>window.addEventListener(ev,e=>{if(!isFileDrag(e))return;e.preventDefault();if(!document.querySelector("dialog[open]"))drop.classList.add("over")}));
+window.addEventListener("dragleave",e=>{if(!e.relatedTarget)drop.classList.remove("over")});
+window.addEventListener("drop",async e=>{if(!isFileDrag(e))return;e.preventDefault();drop.classList.remove("over");if(document.querySelector("dialog[open]")||S.busy)return;addFiles(await filesFromDrop(e.dataTransfer))});
+function saveUi(){SET.ui={mode:document.querySelector("input[name=mode]:checked").value,loader:$("selLoader").value,ver:$("txtVer").hidden?$("selVer").value:$("txtVer").value.trim(),snap:$("chkSnap").checked};saveSet()}
+document.querySelectorAll("input[name=mode]").forEach(r=>r.onchange=()=>{syncMode();setStale();saveUi()});
+["selVer","txtVer","selLoader"].forEach(id=>$(id).addEventListener("change",()=>{setStale();saveUi()}));
+$("chkSnap").onchange=()=>{fillVersions();saveUi()};
+$("btnSelAll").onclick=()=>setVisible(true);
+$("btnSelNone").onclick=()=>setVisible(false);
+document.querySelectorAll("dialog").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
+if(SET.ui){try{const r=document.querySelector('input[name=mode][value="'+SET.ui.mode+'"]');if(r)r.checked=true;if([...$("selLoader").options].some(o=>o.value===SET.ui.loader))$("selLoader").value=SET.ui.loader;$("chkSnap").checked=!!SET.ui.snap}catch(_){}}
+$("btnAnalyze").onclick=analyze;
+$("btnZip").onclick=doZip;
+$("btnFolder").onclick=doFolder;
+$("mods").addEventListener("change",e=>{const u=e.target.dataset.uid;if(!u)return;const en=S.entries.find(x=>x.uid===u);if(en){en.include=e.target.checked;S.userInc[u]=en.include;renderResults();const c=document.getElementById("inc-"+u);if(c)c.focus()}});
+$("mods").addEventListener("click",e=>{const b=e.target.closest("[data-cl]");if(b)openChangelog(b.dataset.cl)});
+$("btnCompat").onclick=compat;
+$("compat").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(!b)return;e.preventDefault();pickVersion(b.dataset.v)});
+$("clClose").onclick=()=>$("clDlg").close();
+$("clTr").onclick=toggleTranslate;
+$("btnAddQ").onclick=searchMods;
+$("addQ").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchMods()}});
+$("sres").addEventListener("click",async e=>{const b=e.target.closest("[data-hit]");if(!b)return;const h=S.hits&&S.hits[+b.dataset.hit];if(!h)return;b.disabled=true;b.textContent=t("added");const p=S.mrProj[h.project_id]||(S.mrProj[h.project_id]=mrProjN(h));await addProject(p)});
+$("addedBox").addEventListener("click",e=>{const b=e.target.closest("[data-rm]");if(b)removeAdded(b.dataset.rm)});
+$("recs").addEventListener("click",async e=>{
+  if(e.target.closest("#btnRecRefresh")){refreshRecs();return}
+  const d=e.target.closest("[data-dis]");if(d){dismissRec(d.dataset.dis);return}
+  const b=e.target.closest("[data-add]");if(!b)return;const p=S.mrProj[b.dataset.add];if(!p)return;
+  b.disabled=true;b.textContent=t("added");S.pop=S.pop.filter(x=>x.id!==p.id);await addProject(p);
+});
+$("sum").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;S.filter=S.filter===b.dataset.f?null:b.dataset.f;renderResults()});
+$("fq").addEventListener("input",()=>renderResults());
+$("btnSettings").onclick=()=>{$("setKey").value=SET.cfKey;$("setProxy").value=SET.cfProxy;$("setPrio").value=SET.priority;$("setChan").value=SET.channel;$("setLang").value=SET.lang;$("setDeps").checked=SET.autoDeps;$("dlg").showModal()};
+$("btnClose").onclick=()=>$("dlg").close();
+$("dlg").addEventListener("close",()=>{
+  const old=JSON.stringify(SET);
+  SET.cfKey=$("setKey").value.trim();SET.cfProxy=$("setProxy").value.trim();SET.priority=$("setPrio").value;SET.channel=$("setChan").value;SET.autoDeps=$("setDeps").checked;
+  const langChanged=SET.lang!==$("setLang").value;SET.lang=$("setLang").value;saveSet();
+  if(JSON.stringify(SET)!==old){
+    const o=JSON.parse(old);
+    if(o.cfKey!==SET.cfKey||o.cfProxy!==SET.cfProxy||o.priority!==SET.priority){S.cfBroken=false;S.identified=false;S.vcache={}}
+    if(!langChanged||o.cfKey!==SET.cfKey||o.channel!==SET.channel||o.autoDeps!==SET.autoDeps||o.cfProxy!==SET.cfProxy||o.priority!==SET.priority)setStale();
+  }
+  applyI18n();
+});
+$("btnCopy").onclick=async()=>{try{await navigator.clipboard.writeText(WORKER);$("btnCopy").textContent=t("copied");setTimeout(()=>$("btnCopy").textContent=t("copy"),1500)}catch(_){const r=document.createRange();r.selectNodeContents($("workerCode"));const s=getSelection();s.removeAllRanges();s.addRange(r)}};
+if(!window.showDirectoryPicker)$("btnFolder").hidden=true;
+syncMode();applyI18n();loadTags();
+</script>
+</body>
+</html>
