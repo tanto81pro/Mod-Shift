@@ -1049,6 +1049,7 @@ async function toggleTranslate(){
 
 const WORKER=`// ModShift - CurseForge proxy (Cloudflare Worker)
 // Secret: CF_KEY = your CurseForge API key
+// Open the Worker address in a browser to check that it works.
 export default {
   async fetch(req, env) {
     const cors = {
@@ -1056,23 +1057,32 @@ export default {
       "Access-Control-Allow-Headers": "content-type, accept",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
     };
+    const json = (o, s) => new Response(JSON.stringify(o, null, 2), { status: s || 200, headers: { ...cors, "content-type": "application/json" } });
     if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+    const key = String(env.CF_KEY || "").trim();
     const u = new URL(req.url);
+    const headers = { "x-api-key": key, "accept": "application/json", "user-agent": "ModShift/1.0 (+https://tanto81pro.github.io/Mod-Shift/)" };
+    if (u.pathname === "/" || u.pathname === "/status") {
+      let curseforge = "not tested";
+      if (key) {
+        const t = await fetch("https://api.curseforge.com/v1/games/432", { headers });
+        curseforge = t.ok ? "OK, the key works" : "CurseForge answered " + t.status + (t.status === 403 ? " (key rejected)" : "");
+      }
+      return json({ worker: "running", keySet: !!key, keyLength: key.length, keyLooksRight: key.length === 60 && key.startsWith("$2a$10$"), curseforge });
+    }
     let target;
     if (u.pathname === "/dl") {
       target = u.searchParams.get("u") || "";
-      if (!/^https:\\/\\/(edge|mediafilez)\\.forgecdn\\.net\\//.test(target))
-        return new Response("bad url", { status: 400, headers: cors });
+      if (!/^https:\\/\\/(edge|mediafilez)\\.forgecdn\\.net\\//.test(target)) return json({ error: "bad url" }, 400);
     } else if (u.pathname.startsWith("/v1/")) {
+      if (!key) return json({ error: "CF_KEY secret is missing" }, 500);
       target = "https://api.curseforge.com" + u.pathname + u.search;
     } else {
-      return new Response("not found", { status: 404, headers: cors });
+      return json({ error: "not found" }, 404);
     }
-    const r = await fetch(target, {
-      method: req.method,
-      headers: { "x-api-key": env.CF_KEY, "content-type": "application/json", "accept": "application/json" },
-      body: req.method === "POST" ? await req.text() : undefined
-    });
+    if (req.method === "POST") headers["content-type"] = "application/json";
+    const r = await fetch(target, { method: req.method, headers, body: req.method === "POST" ? await req.text() : undefined });
+    if (r.status === 401 || r.status === 403) return json({ error: "CurseForge rejected the API key (" + r.status + ")" }, r.status);
     const h = new Headers(r.headers);
     for (const k in cors) h.set(k, cors[k]);
     return new Response(r.body, { status: r.status, headers: h });
