@@ -1,14 +1,11 @@
 package com.tanto.modshift.client;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -17,6 +14,8 @@ import java.util.Locale;
 import java.util.function.BiConsumer;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.Version;
+import net.fabricmc.loader.api.metadata.version.VersionPredicate;
 
 /** Downloads the chosen files, writes the swap plan and starts the helper process. */
 public final class Installer {
@@ -33,48 +32,73 @@ public final class Installer {
 		return Files.exists(planFile());
 	}
 
-	/**
-	 * Downloads every selected file into the staging folder and checks its SHA-1.
-	 * @param progress called with (done, total)
-	 */
-	public static void download(List<UpdateChecker.Update> updates, BiConsumer<Integer, Integer> progress)
+	/** Downloads and checks every file, then writes the plan. Returns the staged jars. */
+	public static List<Path> prepare(List<UpdateChecker.Entry> chosen, BiConsumer<Integer, Integer> progress)
 			throws IOException, InterruptedException {
 		Path staging = workDir().resolve("staging");
 		Files.createDirectories(staging);
-		List<String> plan = new ArrayList<>();
 		Path mods = UpdateChecker.modsDir().toAbsolutePath();
 		String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+		List<String> plan = new ArrayList<>();
 		plan.add("MODS\t" + mods);
 		plan.add("BACKUP\t" + workDir().toAbsolutePath().resolve("backup").resolve(stamp));
+		List<Path> staged = new ArrayList<>();
 
+		List<UpdateChecker.Entry> downloads = chosen.stream().filter(UpdateChecker.Entry::downloads).toList();
 		int done = 0;
-		for (UpdateChecker.Update u : updates) {
-			progress.accept(done, updates.size());
-			if (!u.url.startsWith("https://cdn.modrinth.com/")) {
-				throw new IOException("Refusing to download from an unknown host: " + u.url);
+		for (UpdateChecker.Entry e : downloads) {
+			progress.accept(done, downloads.size());
+			if (e.url == null || !Net.trustedDownload(e.url)) {
+				throw new IOException(e.title + ": refusing to download from " + e.url);
 			}
-			Path target = staging.resolve(u.sha1 + ".jar");
-			if (!Files.exists(target) || !UpdateChecker.sha1(target).equalsIgnoreCase(u.sha1)) {
-				Path tmp = staging.resolve(u.sha1 + ".part");
-				HttpRequest req = HttpRequest.newBuilder(URI.create(u.url)).header("User-Agent", UpdateChecker.USER_AGENT)
-						.timeout(Duration.ofMinutes(5)).GET().build();
-				HttpResponse<Path> r = UpdateChecker.HTTP.send(req, HttpResponse.BodyHandlers.ofFile(tmp));
+			Path target = staging.resolve(e.sha1 + ".jar");
+			if (!Files.exists(target) || !JarInfo.sha1(target).equalsIgnoreCase(e.sha1)) {
+				Path tmp = staging.resolve(e.sha1 + ".part");
+				HttpResponse<Path> r = Net.HTTP.send(Net.downloadRequest(e.url), HttpResponse.BodyHandlers.ofFile(tmp));
 				if (r.statusCode() / 100 != 2) {
 					Files.deleteIfExists(tmp);
-					throw new IOException(u.fileName + ": download failed (" + r.statusCode() + ")");
+					throw new IOException(e.title + ": download failed (" + r.statusCode() + ")");
 				}
-				if (!UpdateChecker.sha1(tmp).equalsIgnoreCase(u.sha1)) {
+				if (!JarInfo.sha1(tmp).equalsIgnoreCase(e.sha1)) {
 					Files.deleteIfExists(tmp);
-					throw new IOException(u.fileName + ": file check failed, the download was damaged");
+					throw new IOException(e.title + ": file check failed, the download was damaged");
 				}
 				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
 			}
-			if (u.oldFile != null) plan.add("DEL\t" + u.oldFile.toAbsolutePath());
-			plan.add("ADD\t" + target.toAbsolutePath() + "\t" + safeName(u.fileName));
+			staged.add(target);
+			if (e.oldFile != null) plan.add("DEL\t" + e.oldFile.toAbsolutePath());
+			plan.add("ADD\t" + target.toAbsolutePath() + "\t" + safeName(e.fileName));
 			done++;
 		}
-		progress.accept(done, updates.size());
+		for (UpdateChecker.Entry e : chosen) {
+			if (e.kind == UpdateChecker.Kind.REMOVE && e.oldFile != null) plan.add("DEL\t" + e.oldFile.toAbsolutePath());
+		}
+		progress.accept(done, downloads.size());
 		Files.write(planFile(), plan, StandardCharsets.UTF_8);
+		return staged;
+	}
+
+	/** Loader versions the new files ask for that the installed loader does not meet. Empty when all is fine. */
+	public static List<String> loaderProblems(List<Path> staged) {
+		List<String> out = new ArrayList<>();
+		Version installed = FabricLoader.getInstance().getModContainer("fabricloader")
+				.map(c -> c.getMetadata().getVersion()).orElse(null);
+		if (installed == null || UpdateChecker.quilt()) return out;
+		String strongest = null;
+		for (Path p : staged) {
+			try {
+				JarInfo j = JarInfo.read(p, false);
+				if (j.loaderRequirement == null) continue;
+				if (!VersionPredicate.parse(j.loaderRequirement).test(installed)) {
+					String need = j.loaderRequirement.replaceAll("[^0-9.]+", " ").trim().split(" ")[0];
+					if (strongest == null || Version.parse(need).compareTo(Version.parse(strongest)) > 0) strongest = need;
+					out.add((j.name != null ? j.name : p.getFileName()) + ": " + j.loaderRequirement);
+				}
+			} catch (Exception ignored) {
+			}
+		}
+		if (strongest != null) out.add(0, strongest + "|" + installed.getFriendlyString());
+		return out;
 	}
 
 	/** Copies the helper out of the mods folder and starts it. The game must be closed right after. */

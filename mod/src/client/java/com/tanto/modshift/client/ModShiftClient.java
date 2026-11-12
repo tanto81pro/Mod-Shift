@@ -43,8 +43,9 @@ public class ModShiftClient implements ClientModInitializer {
 	static Component buttonLabel() {
 		if (Installer.hasPendingPlan()) return Component.translatable("modshift.button.pending");
 		UpdateChecker.Result r = lastResult;
-		if (r != null && !r.updates.isEmpty()) {
-			return Component.translatable("modshift.button.count", r.updates.size());
+		if (r != null) {
+			long n = r.entries.stream().filter(e -> e.kind == UpdateChecker.Kind.UPDATE || e.kind == UpdateChecker.Kind.MANUAL).count();
+			if (n > 0) return Component.translatable("modshift.button.count", n);
 		}
 		return Component.literal("ModShift");
 	}
@@ -69,7 +70,11 @@ public class ModShiftClient implements ClientModInitializer {
 	}
 
 	static String version() {
-		return FabricLoader.getInstance().getModContainer("modshift")
-				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("1.0.0");
+		try {
+			return FabricLoader.getInstance().getModContainer("modshift")
+					.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("1.0.0");
+		} catch (Throwable t) {
+			return "1.0.0";
+		}
 	}
 }
