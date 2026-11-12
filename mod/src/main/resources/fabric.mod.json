@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "modshift",
+	"version": "${version}",
+	"name": "ModShift",
+	"description": "Checks your mods for updates on Modrinth, downloads them, closes the game and swaps the files in your mods folder. Old files are kept as a backup.",
+	"authors": [
+		"tanto811796"
+	],
+	"contact": {
+		"homepage": "https://tanto81pro.github.io/Mod-Shift/",
+		"sources": "https://github.com/tanto81pro/Mod-Shift"
+	},
+	"license": "MIT",
+	"icon": "assets/modshift/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.tanto.modshift.client.ModShiftClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
